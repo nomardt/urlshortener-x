@@ -70,5 +70,4 @@ func mainPage(w http.ResponseWriter, r *http.Request) {
 	} else {
 		http.Error(w, "Bad Request", http.StatusBadRequest)
 	}
-	return
 }
