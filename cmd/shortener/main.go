@@ -25,7 +25,7 @@ func run() error {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/", mainPage)
 
-	return http.ListenAndServe(`:8081`, mux)
+	return http.ListenAndServe(`:8080`, mux)
 }
 
 func mainPage(w http.ResponseWriter, r *http.Request) {
