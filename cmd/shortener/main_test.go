@@ -68,6 +68,7 @@ func Test_mainPageHandler(t *testing.T) {
 			mainPage(w, r)
 
 			res := w.Result()
+			defer res.Body.Close()
 			assert.Equal(t, tt.want.code, res.StatusCode)
 			assert.Equal(t, tt.want.location, res.Header.Get("Location"))
 		})
