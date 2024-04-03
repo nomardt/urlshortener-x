@@ -10,10 +10,10 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func Test_newUriHandler(t *testing.T) {
+func Test_newURIHandler(t *testing.T) {
 	type args struct {
 		body    string
-		storage UriStorage
+		storage URIStorage
 	}
 	type want struct {
 		code int
@@ -36,14 +36,14 @@ func Test_newUriHandler(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			newUri := newUriHandler(tt.args.storage)
+			newURI := newURIHandler(tt.args.storage)
 
 			w := httptest.NewRecorder()
 			r := httptest.NewRequest(http.MethodPost, "/", strings.NewReader(tt.args.body))
 
 			r.Header.Add("Content-Type", "text/plain")
 
-			newUri(w, r)
+			newURI(w, r)
 
 			res := w.Result()
 			defer res.Body.Close()
@@ -52,10 +52,10 @@ func Test_newUriHandler(t *testing.T) {
 	}
 }
 
-func Test_getUriHandler(t *testing.T) {
+func Test_getURIHandler(t *testing.T) {
 	type args struct {
 		path    string
-		storage UriStorage
+		storage URIStorage
 	}
 	type want struct {
 		code     int
@@ -93,12 +93,12 @@ func Test_getUriHandler(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			getUri := getUriHandler(tt.args.storage, tt.args.path[1:])
+			getURI := getURIHandler(tt.args.storage, tt.args.path[1:])
 
 			w := httptest.NewRecorder()
 			r := httptest.NewRequest(http.MethodGet, tt.args.path, nil)
 			fmt.Println(r)
-			getUri(w, r)
+			getURI(w, r)
 
 			res := w.Result()
 			defer res.Body.Close()

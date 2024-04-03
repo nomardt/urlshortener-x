@@ -13,11 +13,11 @@ import (
 )
 
 // Declaring the map to store shortened URLs in
-type UriStorage map[string]string
+type URIStorage map[string]string
 
-var storage UriStorage
+var storage URIStorage
 
-func newUriHandler(storage UriStorage) http.HandlerFunc {
+func newURIHandler(storage URIStorage) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Get the body value
 		body, err := io.ReadAll(r.Body)
@@ -43,7 +43,7 @@ func newUriHandler(storage UriStorage) http.HandlerFunc {
 	}
 }
 
-func getUriHandler(storage UriStorage, unitTestID ...string) http.HandlerFunc {
+func getURIHandler(storage URIStorage, unitTestID ...string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		id := chi.URLParam(r, "id")
 
@@ -63,13 +63,13 @@ func getUriHandler(storage UriStorage, unitTestID ...string) http.HandlerFunc {
 }
 
 func main() {
-	storage = make(UriStorage)
+	storage = make(URIStorage)
 	r := chi.NewRouter()
 
 	r.Use(middleware.AllowContentType("text/plain"))
 
-	r.Post("/", newUriHandler(storage))
-	r.Get("/{id}", getUriHandler(storage))
+	r.Post("/", newURIHandler(storage))
+	r.Get("/{id}", getURIHandler(storage))
 
 	log.Fatal(http.ListenAndServe(`:8080`, r))
 }
