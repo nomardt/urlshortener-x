@@ -1,6 +1,8 @@
 package main
 
 import (
+	"fmt"
+	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
@@ -8,13 +10,52 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func Test_mainPageHandler(t *testing.T) {
+func Test_newURIHandler(t *testing.T) {
 	type args struct {
-		path        string
-		body        string
-		storage     uriStorage
-		contentType string
-		method      string
+		body    string
+		storage URIStorage
+	}
+	type want struct {
+		code int
+	}
+	tests := []struct {
+		name string
+		args args
+		want want
+	}{
+		{
+			name: "POST valid",
+			args: args{
+				body:    "https://example.com",
+				storage: make(map[string]string),
+			},
+			want: want{
+				code: 201,
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			newURI := newURIHandler(tt.args.storage)
+
+			w := httptest.NewRecorder()
+			r := httptest.NewRequest(http.MethodPost, "/", strings.NewReader(tt.args.body))
+
+			r.Header.Add("Content-Type", "text/plain")
+
+			newURI(w, r)
+
+			res := w.Result()
+			defer res.Body.Close()
+			assert.Equal(t, tt.want.code, res.StatusCode)
+		})
+	}
+}
+
+func Test_getURIHandler(t *testing.T) {
+	type args struct {
+		path    string
+		storage URIStorage
 	}
 	type want struct {
 		code     int
@@ -26,26 +67,9 @@ func Test_mainPageHandler(t *testing.T) {
 		want want
 	}{
 		{
-			name: "POST valid URL",
-			args: args{
-				path:        "/",
-				body:        "https://example.com",
-				contentType: "text/plain",
-				method:      "POST",
-				storage:     make(map[string]string),
-			},
-			want: want{
-				code:     201,
-				location: "",
-			},
-		},
-		{
 			name: "GET valid URL",
 			args: args{
-				path:        "/aaaaaaaa",
-				body:        "",
-				contentType: "",
-				method:      "GET",
+				path: "/aaaaaaaa",
 				storage: map[string]string{
 					"aaaaaaaa": "https://example.com",
 				},
@@ -55,17 +79,26 @@ func Test_mainPageHandler(t *testing.T) {
 				location: "https://example.com",
 			},
 		},
+		{
+			name: "GET invalid URL",
+			args: args{
+				path:    "/aaaaaaaa",
+				storage: make(map[string]string),
+			},
+			want: want{
+				code:     400,
+				location: "",
+			},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			mainPage := mainPageHandler(tt.args.storage)
+			getURI := getURIHandler(tt.args.storage, tt.args.path[1:])
 
 			w := httptest.NewRecorder()
-			r := httptest.NewRequest(tt.args.method, tt.args.path, strings.NewReader(tt.args.body))
-			if tt.args.contentType != "" {
-				r.Header.Add("Content-Type", tt.args.contentType)
-			}
-			mainPage(w, r)
+			r := httptest.NewRequest(http.MethodGet, tt.args.path, nil)
+			fmt.Println(r)
+			getURI(w, r)
 
 			res := w.Result()
 			defer res.Body.Close()
