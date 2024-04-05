@@ -9,7 +9,6 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
-	"github.com/nomardt/urlshortener-x/cmd/config"
 	"github.com/nomardt/urlshortener-x/internal/idgenerator"
 )
 
@@ -17,7 +16,6 @@ import (
 type URIStorage map[string]string
 
 var storage URIStorage
-var conf config.Configuration
 
 func newURIHandler(storage URIStorage) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -37,16 +35,11 @@ func newURIHandler(storage URIStorage) http.HandlerFunc {
 		}
 
 		// Add the received URL to storage
-		var key string
-		if conf.Path == "" {
-			key = idgenerator.GenerateRandomID(8)
-		} else {
-			key = conf.Path
-		}
-		storage[key] = u.String()
+		randomID := idgenerator.GenerateRandomID(8)
+		storage[randomID] = u.String()
 
 		w.WriteHeader(http.StatusCreated)
-		w.Write([]byte("http://" + conf.Socket + "/" + key))
+		w.Write([]byte("http://localhost:8080/" + randomID))
 	}
 }
 
@@ -78,8 +71,5 @@ func main() {
 	r.Post("/", newURIHandler(storage))
 	r.Get("/{id}", getURIHandler(storage))
 
-	// Gets the Configuration type with default socket and path to store shortened URIs
-	conf = config.InitializeConfig()
-
-	log.Fatal(http.ListenAndServe(conf.Socket, r))
+	log.Fatal(http.ListenAndServe(`:8080`, r))
 }
