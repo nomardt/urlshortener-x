@@ -5,6 +5,7 @@ import (
 	"flag"
 	"fmt"
 	"net"
+	"regexp"
 	"strconv"
 	"strings"
 )
@@ -17,6 +18,7 @@ type Configuration struct {
 func InitializeConfig() Configuration {
 	config := Configuration{
 		Socket: "127.0.0.1:8080",
+		Path:   "",
 	}
 
 	flag.Func("a", "Specify the address you want to start the server at (e.g. 127.0.0.1:8888)", func(addr string) error {
@@ -44,7 +46,16 @@ func InitializeConfig() Configuration {
 		config.Socket = addr
 		return nil
 	})
-	flag.StringVar(&config.Path, "b", "", "Specify the path you want to shorten all URLs at")
+	flag.Func("b", "Specify the path you want to shorten all URLs at", func(path string) error {
+		re := regexp.MustCompile("[^a-zA-Z0-9_.~-]+")
+		if re.MatchString(path) {
+			return errors.New("please use only alphanumeric characters as the default path")
+		}
+
+		config.Path = path
+
+		return nil
+	})
 	flag.Parse()
 
 	return config
