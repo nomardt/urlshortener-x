@@ -43,7 +43,7 @@ func InitializeConfig() Configuration {
 			return errors.New("please specify a valid address! Example: 127.0.0.1:8888")
 		}
 
-		config.Socket = addr
+		config.Socket = string(host) + ":" + hp[1]
 		return nil
 	})
 	flag.Func("b", "Specify the path you want to shorten all URLs at", func(path string) error {
