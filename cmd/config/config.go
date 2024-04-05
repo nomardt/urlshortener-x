@@ -43,6 +43,7 @@ func InitializeConfig() Configuration {
 			return errors.New("please specify a valid address! Example: 127.0.0.1:8888")
 		}
 
+		// This changes the host from localhost to 127.0.0.1
 		config.Socket = string(host) + ":" + hp[1]
 		return nil
 	})
