@@ -6,7 +6,6 @@ import (
 	"log"
 	"net/http"
 	"net/url"
-	"strings"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
@@ -31,7 +30,7 @@ func newURIHandler(storage URIStorage) http.HandlerFunc {
 
 		// Check if the body value is an actual URI
 		u, err := url.ParseRequestURI(string(body))
-		if err != nil || (u.Scheme != "http" && u.Scheme != "https") || !strings.Contains(u.Host, ".") || string(u.Host[0]) == "." || string(u.Host[len(u.Host)-1]) == "." {
+		if err != nil || (u.Scheme != "http" && u.Scheme != "https") || string(u.Host[0]) == "." || string(u.Host[len(u.Host)-1]) == "." {
 			http.Error(w, "Please enter a valid URL", http.StatusBadRequest)
 			return
 		}
