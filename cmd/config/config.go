@@ -44,8 +44,8 @@ func setSocket(addr string) error {
 }
 
 func InitializeConfig() Configuration {
-	flag.Func("a", "Specify the address you want to start the server at (e.g. 127.0.0.1:8888)", setSocket)
-	flag.Func("b", "Specify the path you want to save all the shortened URIs at", func(urlRaw string) error {
+	flag.Func("a", "Specify the IP:PORT you want to start the server at (e.g. 127.0.0.1:8888)", setSocket)
+	flag.Func("b", "Specify the full URI where you want to keep the shortened URIs at (e.g. http://localhost:8080/defaultPath)", func(urlRaw string) error {
 		// Check if the flag value is an actual URL
 		u, err := url.ParseRequestURI(urlRaw)
 		if err != nil || (u.Scheme != "http" && u.Scheme != "https") || string(u.Host[0]) == "." || string(u.Host[len(u.Host)-1]) == "." {
