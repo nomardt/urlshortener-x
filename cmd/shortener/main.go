@@ -78,7 +78,7 @@ func main() {
 	r.Post("/", newURIHandler(storage))
 	r.Get("/{id}", getURIHandler(storage))
 
-	conf = config.InitializeConfig()
+	conf = config.LoadConfig()
 
 	fmt.Println("Started the server at:", conf.Socket)
 	log.Fatal(http.ListenAndServe(conf.Socket, r))
