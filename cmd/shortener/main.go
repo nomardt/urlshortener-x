@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"io"
 	"log"
 	"net/http"
@@ -9,13 +10,15 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
+	"github.com/nomardt/urlshortener-x/cmd/config"
 	"github.com/nomardt/urlshortener-x/internal/idgenerator"
 )
 
-// Declaring the map to store shortened URLs in
+// Declaring the map to store the shortened URIs at
 type URIStorage map[string]string
 
 var storage URIStorage
+var conf config.Configuration
 
 func newURIHandler(storage URIStorage) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -26,20 +29,24 @@ func newURIHandler(storage URIStorage) http.HandlerFunc {
 			return
 		}
 
-		// Check if the body value is an actual URL
+		// Check if the body value is an actual URI
 		u, err := url.ParseRequestURI(string(body))
-		hostname := u.Host
-		if err != nil || (u.Scheme != "http" && u.Scheme != "https") || !strings.Contains(hostname, ".") || string(hostname[0]) == "." || string(hostname[len(hostname)-1]) == "." {
+		if err != nil || (u.Scheme != "http" && u.Scheme != "https") || !strings.Contains(u.Host, ".") || string(u.Host[0]) == "." || string(u.Host[len(u.Host)-1]) == "." {
 			http.Error(w, "Please enter a valid URL", http.StatusBadRequest)
 			return
 		}
 
-		// Add the received URL to storage
-		randomID := idgenerator.GenerateRandomID(8)
-		storage[randomID] = u.String()
+		// Add the received URI to shortened URIs storage
+		var key string
+		if conf.Path == "" {
+			key = idgenerator.GenerateRandomID(8)
+		} else {
+			key = conf.Path
+		}
+		storage[key] = u.String()
 
 		w.WriteHeader(http.StatusCreated)
-		w.Write([]byte("http://localhost:8080/" + randomID))
+		w.Write([]byte("http://" + conf.Socket + "/" + key))
 	}
 }
 
@@ -47,7 +54,8 @@ func getURIHandler(storage URIStorage, unitTestID ...string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		id := chi.URLParam(r, "id")
 
-		// This is necessary because chi.URLParam doesn't parse IDs from unit tests for some reason
+		// This is necessary because chi.URLParam doesn't parse IDs provided in path
+		// from unit tests for some reason
 		if len(unitTestID) > 0 {
 			id = unitTestID[0]
 		}
@@ -71,5 +79,8 @@ func main() {
 	r.Post("/", newURIHandler(storage))
 	r.Get("/{id}", getURIHandler(storage))
 
-	log.Fatal(http.ListenAndServe(`:8080`, r))
+	conf = config.InitializeConfig()
+
+	fmt.Println("Started the server at:", conf.Socket)
+	log.Fatal(http.ListenAndServe(conf.Socket, r))
 }
