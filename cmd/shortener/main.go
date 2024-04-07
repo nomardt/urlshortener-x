@@ -21,21 +21,18 @@ var conf config.Configuration
 
 func newURIHandler(storage URIStorage) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		// Get the body value
 		body, err := io.ReadAll(r.Body)
 		if err != nil || string(body) == "" {
 			http.Error(w, "Bad Request", http.StatusBadRequest)
 			return
 		}
 
-		// Check if the body value is an actual URI
 		u, err := url.ParseRequestURI(string(body))
 		if err != nil || (u.Scheme != "http" && u.Scheme != "https") || string(u.Host[0]) == "." || string(u.Host[len(u.Host)-1]) == "." {
 			http.Error(w, "Please enter a valid URL", http.StatusBadRequest)
 			return
 		}
 
-		// Add the received URI to shortened URIs storage
 		var key string
 		if conf.Path == "" {
 			key = idgenerator.GenerateRandomID(8)
@@ -45,7 +42,10 @@ func newURIHandler(storage URIStorage) http.HandlerFunc {
 		storage[key] = u.String()
 
 		w.WriteHeader(http.StatusCreated)
-		w.Write([]byte("http://" + conf.Socket + "/" + key))
+		_, err = w.Write([]byte("http://" + conf.Socket + "/" + key))
+		if err != nil {
+			fmt.Println(err)
+		}
 	}
 }
 
@@ -53,8 +53,7 @@ func getURIHandler(storage URIStorage, unitTestID ...string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		id := chi.URLParam(r, "id")
 
-		// This is necessary because chi.URLParam doesn't parse IDs provided in path
-		// from unit tests for some reason
+		// If it's a unit test then the id is provided as an argument
 		if len(unitTestID) > 0 {
 			id = unitTestID[0]
 		}
@@ -71,15 +70,15 @@ func getURIHandler(storage URIStorage, unitTestID ...string) http.HandlerFunc {
 
 func main() {
 	storage = make(URIStorage)
-	r := chi.NewRouter()
+	router := chi.NewRouter()
 
-	r.Use(middleware.AllowContentType("text/plain"))
+	router.Use(middleware.AllowContentType("text/plain"))
 
-	r.Post("/", newURIHandler(storage))
-	r.Get("/{id}", getURIHandler(storage))
+	router.Post("/", newURIHandler(storage))
+	router.Get("/{id}", getURIHandler(storage))
 
 	conf = config.LoadConfig()
 
-	fmt.Println("Started the server at:", conf.Socket)
-	log.Fatal(http.ListenAndServe(conf.Socket, r))
+	fmt.Println("Server started at:", conf.Socket)
+	log.Fatal(http.ListenAndServe(conf.Socket, router))
 }

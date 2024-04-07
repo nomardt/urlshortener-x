@@ -33,6 +33,16 @@ func Test_newURIHandler(t *testing.T) {
 				code: 201,
 			},
 		},
+		{
+			name: "POST invalid (wrong schema)",
+			args: args{
+				body:    "gopher://example.com",
+				storage: make(map[string]string),
+			},
+			want: want{
+				code: 400,
+			},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
