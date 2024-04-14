@@ -11,7 +11,7 @@ type Configuration struct {
 }
 
 var config = Configuration{
-	ListenAddress: "127.0.0.1:8080",
+	ListenAddress: "127.0.0.1:80",
 	Path:          "",
 }
 
