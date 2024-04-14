@@ -16,10 +16,10 @@ func (h *Handler) PostURI(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var u *urls.URL
-	if h.defaultRoute == "" {
+	if h.Configuration.Path == "" {
 		u, err = urls.NewURLWithoutID(string(body))
 	} else {
-		u, err = urls.NewURL(string(body), h.defaultRoute)
+		u, err = urls.NewURL(string(body), h.Configuration.Path)
 
 	}
 	if err != nil {
@@ -28,7 +28,7 @@ func (h *Handler) PostURI(w http.ResponseWriter, r *http.Request) {
 	}
 	h.SaveURL(u)
 	w.WriteHeader(http.StatusCreated)
-	_, err = w.Write([]byte("http://127.0.0.1/" + u.ID()))
+	_, err = w.Write([]byte("http://" + h.Configuration.ListenAddress + "/" + u.ID()))
 	if err != nil {
 		fmt.Println(err)
 	}

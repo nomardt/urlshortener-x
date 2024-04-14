@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	conf "github.com/nomardt/urlshortener-x/cmd/config"
 	urlsDomain "github.com/nomardt/urlshortener-x/internal/domain/urls"
 )
 
@@ -11,12 +12,12 @@ type Repository interface {
 
 type Handler struct {
 	Repository
-	defaultRoute string
+	conf.Configuration
 }
 
-func NewHandler(repo Repository, defaultPath string) *Handler {
+func NewHandler(repo Repository, config conf.Configuration) *Handler {
 	return &Handler{
-		Repository:   repo,
-		defaultRoute: defaultPath,
+		Repository:    repo,
+		Configuration: config,
 	}
 }

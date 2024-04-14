@@ -18,7 +18,7 @@ func Run(config conf.Configuration) error {
 	router.Use(middleware.AllowContentType("text/plain"))
 
 	urlsRepo := urlsInfra.NewInMemoryRepo()
-	urls.Setup(router, urlsRepo, config.Path)
+	urls.Setup(router, urlsRepo, config)
 
 	fmt.Println("Server started at:", config.ListenAddress)
 	if err := http.ListenAndServe(config.ListenAddress, router); err != nil {
