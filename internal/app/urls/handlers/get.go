@@ -17,6 +17,6 @@ func (h *Handler) GetURI(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusTemporaryRedirect)
 	} else {
-		http.Error(w, "URL with the specified ID was not found on the server!", http.StatusBadRequest)
+		http.Error(w, "URL with the specified ID:"+id+" was not found on the server!", http.StatusBadRequest)
 	}
 }

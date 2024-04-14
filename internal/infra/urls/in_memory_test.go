@@ -6,7 +6,7 @@ import (
 	urlsDomain "github.com/nomardt/urlshortener-x/internal/domain/urls"
 )
 
-func TestInMemoryRepo_SaveURL(t *testing.T) {
+func Test_SaveURL(t *testing.T) {
 	repo := NewInMemoryRepo()
 
 	// Test case: Save a URL
@@ -17,12 +17,15 @@ func TestInMemoryRepo_SaveURL(t *testing.T) {
 	}
 }
 
-func TestInMemoryRepo_GetURL(t *testing.T) {
+func Test_GetURL(t *testing.T) {
 	repo := NewInMemoryRepo()
 
 	// Test case: Get existing URL
 	testURL, _ := urlsDomain.NewURL("https://example.com", "123")
-	repo.SaveURL(testURL)
+	err := repo.SaveURL(testURL)
+	if err != nil {
+		t.Errorf("Expected no error, got: %v", err)
+	}
 	tc := "123"
 	foundURL, err := repo.GetURL(&tc)
 	if err != nil {

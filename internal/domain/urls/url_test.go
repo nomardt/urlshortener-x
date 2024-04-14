@@ -5,7 +5,7 @@ import (
 	"testing"
 )
 
-func TestNewURL(t *testing.T) {
+func Test_NewURL(t *testing.T) {
 	type args struct {
 		longURL string
 		id      string

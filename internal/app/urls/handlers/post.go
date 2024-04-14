@@ -26,7 +26,11 @@ func (h *Handler) PostURI(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Please enter a valid URL", http.StatusBadRequest)
 		return
 	}
-	h.SaveURL(u)
+	err = h.SaveURL(u)
+	if err != nil {
+		http.Error(w, "Something went wrong during saving", http.StatusBadRequest)
+		return
+	}
 	w.WriteHeader(http.StatusCreated)
 	_, err = w.Write([]byte("http://" + h.Configuration.ListenAddress + "/" + u.ID()))
 	if err != nil {
