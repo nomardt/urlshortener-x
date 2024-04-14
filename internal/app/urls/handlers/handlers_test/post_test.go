@@ -85,6 +85,7 @@ func Test_PostURI(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			req, _ := testPostRequest(t, ts, tc.method, tc.args.requestPath, tc.args.contentType, tc.args.urlToShorten)
+			defer req.Body.Close()
 
 			assert.Equal(t, tc.expectedCode, req.StatusCode)
 		})

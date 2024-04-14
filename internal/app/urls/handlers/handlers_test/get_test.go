@@ -76,9 +76,11 @@ func Test_GetURI(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			// Adding a shortened URL at /path
-			testPostRequest(t, ts, "POST", "/", "text/plain", "https://example.com")
+			req, _ := testPostRequest(t, ts, "POST", "/", "text/plain", "https://example.com")
+			req.Body.Close()
 
-			req, _ := testGetRequest(t, ts, tc.method, tc.args.requestPath)
+			req, _ = testGetRequest(t, ts, tc.method, tc.args.requestPath)
+			defer req.Body.Close()
 
 			assert.Equal(t, tc.expectedCode, req.StatusCode)
 		})
