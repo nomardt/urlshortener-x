@@ -20,7 +20,7 @@ func testGetRequest(t *testing.T, ts *httptest.Server, method,
 	require.NoError(t, err)
 
 	client := ts.Client()
-	// Preventing the client from following the redirect, ErrUseLastResponse returns no nil as err
+	// Preventing the client from following the redirect, ErrUseLastResponse returns nil as err
 	client.CheckRedirect = func(req *http.Request, via []*http.Request) error {
 		return http.ErrUseLastResponse
 	}

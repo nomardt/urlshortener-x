@@ -9,7 +9,7 @@ import (
 
 type InMemoryRepo struct {
 	urls map[string]string
-	mu   sync.RWMutex
+	mu   sync.Mutex
 }
 
 var (
