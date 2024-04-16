@@ -65,7 +65,7 @@ func Test_PostURI(t *testing.T) {
 		{
 			name:         "GET instead of POST",
 			method:       http.MethodGet,
-			expectedCode: http.StatusBadRequest,
+			expectedCode: http.StatusMethodNotAllowed,
 			args:         args{"/", "", ""},
 		},
 		{
