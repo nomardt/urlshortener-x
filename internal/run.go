@@ -20,7 +20,7 @@ func Run(config conf.Configuration) error {
 
 	router := chi.NewRouter()
 
-	router.Use(middleware.AllowContentType("text/plain"))
+	router.Use(middleware.AllowContentType("text/plain", "application/json"))
 
 	urlsRepo := urlsInfra.NewInMemoryRepo()
 	urls.Setup(router, urlsRepo, config)

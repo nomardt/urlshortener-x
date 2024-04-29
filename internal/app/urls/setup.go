@@ -12,4 +12,6 @@ func Setup(router *chi.Mux, urlsRepo handlers.Repository, config conf.Configurat
 
 	router.Post("/", logger.WithLogging(handler.PostURI))
 	router.Get("/{id}", logger.WithLogging(handler.GetURI))
+
+	router.Post("/api/shorten", logger.WithLogging(handler.JSONPostURI))
 }
