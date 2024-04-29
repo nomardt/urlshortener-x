@@ -5,6 +5,7 @@ import (
 	"errors"
 	"io"
 	"net/http"
+	"strings"
 
 	"github.com/nomardt/urlshortener-x/internal/domain/urls"
 	"github.com/nomardt/urlshortener-x/internal/infra/logger"
@@ -45,7 +46,7 @@ func shortenURL(urlInput string, h *Handler) (string, error) {
 
 func (h *Handler) JSONPostURI(w http.ResponseWriter, r *http.Request) {
 	contentType := r.Header.Get("Content-Type")
-	if contentType != "application/json" {
+	if !strings.HasPrefix(contentType, "application/json") {
 		http.Error(w, "Please use only \"Content-Type: application/json\" for this endpoint!", http.StatusUnsupportedMediaType)
 		return
 	}
@@ -83,7 +84,7 @@ func (h *Handler) JSONPostURI(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) PostURI(w http.ResponseWriter, r *http.Request) {
 	contentType := r.Header.Get("Content-Type")
-	if contentType != "text/plain" {
+	if !strings.HasPrefix(contentType, "text/plain") {
 		http.Error(w, "Please use only \"Content-Type: text/plain\" for this endpoint!", http.StatusUnsupportedMediaType)
 		return
 	}
