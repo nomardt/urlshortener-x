@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"compress/gzip"
 	"encoding/json"
 	"errors"
 	"io"
@@ -49,7 +50,17 @@ func shortenURL(urlInput string, h *Handler) (string, error) {
 
 func (h *Handler) JSONPostURI(w http.ResponseWriter, r *http.Request) {
 	contentType := r.Header.Get("Content-Type")
-	if !strings.Contains(contentType, "application/json") {
+	if strings.Contains(contentType, "application/x-gzip") {
+		rg, err := gzip.NewReader(r.Body)
+		if err != nil {
+			http.Error(w, "Bad Request", http.StatusBadRequest)
+			logger.Log.Info("Couldn't decompress request body", zap.String("error", err.Error()))
+			return
+		}
+		defer rg.Close()
+
+		r.Body = rg
+	} else if !strings.Contains(contentType, "application/json") {
 		http.Error(w, "Please use only \"Content-Type: application/json\" for this endpoint!", http.StatusUnsupportedMediaType)
 		return
 	}
@@ -75,19 +86,29 @@ func (h *Handler) JSONPostURI(w http.ResponseWriter, r *http.Request) {
 	jsonResp, err := json.MarshalIndent(serverOutput, "", "	")
 	if err != nil {
 		http.Error(w, "Something went wrong...", http.StatusInternalServerError)
-		logger.Log.Debug("Couldn't create JSON", zap.String("error", err.Error()))
+		logger.Log.Info("Couldn't create JSON", zap.String("error", err.Error()))
 		return
 	}
 	_, err = w.Write([]byte(jsonResp))
 	if err != nil {
-		logger.Log.Debug("Couldn't send the response with shortened URL address", zap.String("error", err.Error()))
+		logger.Log.Info("Couldn't send the response with shortened URL address", zap.String("error", err.Error()))
 		return
 	}
 }
 
 func (h *Handler) PostURI(w http.ResponseWriter, r *http.Request) {
 	contentType := r.Header.Get("Content-Type")
-	if !strings.Contains(contentType, "text/plain") {
+	if strings.Contains(contentType, "application/x-gzip") {
+		rg, err := gzip.NewReader(r.Body)
+		if err != nil {
+			http.Error(w, "Bad Request", http.StatusBadRequest)
+			logger.Log.Info("Couldn't decompress request body", zap.String("error", err.Error()))
+			return
+		}
+		defer rg.Close()
+
+		r.Body = rg
+	} else if !strings.Contains(contentType, "text/plain") {
 		http.Error(w, "Please use only \"Content-Type: text/plain\" for this endpoint!", http.StatusUnsupportedMediaType)
 		return
 	}
@@ -107,7 +128,7 @@ func (h *Handler) PostURI(w http.ResponseWriter, r *http.Request) {
 
 	_, err = w.Write([]byte("http://" + h.Configuration.ListenAddress + "/" + id))
 	if err != nil {
-		logger.Log.Debug("Couldn't send the response with shortened URL address", zap.String("error", err.Error()))
+		logger.Log.Info("Couldn't send the response with shortened URL address", zap.String("error", err.Error()))
 		return
 	}
 }
