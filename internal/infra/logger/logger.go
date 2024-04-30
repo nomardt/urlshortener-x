@@ -46,12 +46,13 @@ func WithLogging(h http.HandlerFunc) http.HandlerFunc {
 
 		duration := time.Since(start)
 
-		Log.Info("Received request",
+		Log.Info("Handled request",
 			zap.String("uri", r.RequestURI),
 			zap.String("method", r.Method),
 			zap.String("duration", duration.String()),
 			zap.Int("size", responseData.size),
 			zap.Int("status", responseData.status),
+			zap.String("IP", r.RemoteAddr),
 		)
 	}
 	return http.HandlerFunc(logFn)

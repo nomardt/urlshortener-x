@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/nomardt/urlshortener-x/internal/domain/urls"
 	"github.com/nomardt/urlshortener-x/internal/infra/logger"
@@ -27,6 +28,7 @@ func shortenURL(urlInput string, h *Handler) (string, error) {
 
 	var u *urls.URL
 	var err error
+	// If a key is predefined in config then store all shortened URLs at that path
 	if h.Configuration.Path == "" {
 		u, err = urls.NewURLWithoutID(urlInput)
 	} else {
@@ -40,6 +42,7 @@ func shortenURL(urlInput string, h *Handler) (string, error) {
 	if err != nil {
 		return "", errors.New("couldn't save")
 	}
+	logger.Log.Info("Shortened new URI", zap.String("data", urlInput), zap.String("date", time.Now().Format("2006/01/02")), zap.String("time", time.Now().Format("15:04:05")))
 
 	return u.ID(), nil
 }
