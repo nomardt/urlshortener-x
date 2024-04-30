@@ -49,7 +49,7 @@ func shortenURL(urlInput string, h *Handler) (string, error) {
 
 func (h *Handler) JSONPostURI(w http.ResponseWriter, r *http.Request) {
 	contentType := r.Header.Get("Content-Type")
-	if !strings.HasPrefix(contentType, "application/json") {
+	if !strings.Contains(contentType, "application/json") {
 		http.Error(w, "Please use only \"Content-Type: application/json\" for this endpoint!", http.StatusUnsupportedMediaType)
 		return
 	}
@@ -87,7 +87,7 @@ func (h *Handler) JSONPostURI(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) PostURI(w http.ResponseWriter, r *http.Request) {
 	contentType := r.Header.Get("Content-Type")
-	if !strings.HasPrefix(contentType, "text/plain") {
+	if !strings.Contains(contentType, "text/plain") {
 		http.Error(w, "Please use only \"Content-Type: text/plain\" for this endpoint!", http.StatusUnsupportedMediaType)
 		return
 	}
