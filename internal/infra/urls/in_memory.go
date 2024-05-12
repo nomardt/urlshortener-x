@@ -58,7 +58,7 @@ func (r *InMemoryRepo) SaveURL(url *urlsDomain.URL) error {
 		}
 		data = append(data, '\n')
 
-		file.Write(data)
+		_, _ = file.Write(data)
 		file.Close()
 	}
 

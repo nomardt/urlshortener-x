@@ -24,24 +24,38 @@ func Run(config conf.Configuration) error {
 		return err
 	}
 
-	ps := fmt.Sprintf("host=%s user=%s password=%s dbname=%s sslmode=%s",
-		config.DB.Host, config.DB.User, config.DB.Password, config.DB.DBname, config.DB.SSLmode)
-	db, err := sql.Open("pgx", ps)
-	if err != nil {
-		return err
-	}
-	defer db.Close()
-
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-	if err = db.PingContext(ctx); err != nil {
-		return err
-	}
-
 	router := chi.NewRouter()
 
 	router.Use(middleware.AllowContentType("text/plain", "application/json", "application/x-gzip"))
 	router.Use(middleware.Compress(3))
+
+	if config.DB.Host != "" {
+		ps := fmt.Sprintf("host=%s user=%s password=%s dbname=%s sslmode=%s",
+			config.DB.Host, config.DB.User, config.DB.Password, config.DB.DBname, config.DB.SSLmode)
+		db, err := sql.Open("pgx", ps)
+		if err != nil {
+			return err
+		}
+		defer db.Close()
+
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+		if err = db.PingContext(ctx); err != nil {
+			return err
+		}
+
+		router.Get("/ping", logger.WithLogging(func(w http.ResponseWriter, r *http.Request) {
+			if err := db.PingContext(ctx); err != nil {
+				http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+				return
+			} else {
+				http.Error(w, "OK", http.StatusOK)
+				return
+			}
+		}))
+
+		logger.Log.Info("PostgreSQL initiated succesfully")
+	}
 
 	urlsRepo := urlsInfra.NewInMemoryRepo()
 	if err := urlsRepo.LoadStoredURLs(config); err != nil {
@@ -52,16 +66,6 @@ func Run(config conf.Configuration) error {
 		}
 	}
 	urls.Setup(router, urlsRepo, config)
-
-	router.Get("/ping", logger.WithLogging(func(w http.ResponseWriter, r *http.Request) {
-		if err := db.PingContext(ctx); err != nil {
-			w.WriteHeader(http.StatusInternalServerError)
-			w.Write([]byte("Internal Server Error"))
-		} else {
-			w.WriteHeader(http.StatusOK)
-			w.Write([]byte("OK"))
-		}
-	}))
 
 	logger.Log.Info("The server has started", zap.String("address", config.ListenAddress))
 	if err := http.ListenAndServe(config.ListenAddress, router); err != nil {

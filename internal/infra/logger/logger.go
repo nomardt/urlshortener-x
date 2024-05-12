@@ -53,6 +53,8 @@ func WithLogging(h http.HandlerFunc) http.HandlerFunc {
 			zap.Int("size", responseData.size),
 			zap.Int("status", responseData.status),
 			zap.String("IP", r.RemoteAddr),
+			zap.String("date", time.Now().Format("2006/01/02")),
+			zap.String("time", time.Now().Format("15:04:05")),
 		)
 	}
 	return http.HandlerFunc(logFn)
