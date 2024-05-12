@@ -16,6 +16,8 @@ var (
 	ErrInvalidURL         = errors.New("please enter a valid URL! Input example: http://localhost:8888/qsd54gFg")
 	ErrInvalidPath        = errors.New("please specify a valid path! It can only contain alphanumeric characters, '.', '_', '~' and '-'")
 	ErrNestedDirs         = errors.New("unsupported URL structure! No nested directories are allowed. Valid input example: http://localhost:8888/qsd54gFg")
+	ErrInvalidDSN         = errors.New("please specify a valid DSN! Example: postgres://username:password@localhost:5432/mydatabase?sslmode=disable")
+	ErrDBNotImplemented   = errors.New("only PostgreSQL is supported")
 )
 
 func setListenAddress(addr string) error {
@@ -62,6 +64,27 @@ func setURL(urlRaw string) error {
 		config.Path = urlSplit[3]
 	} else if len(urlSplit) > 4 {
 		return ErrNestedDirs
+	}
+
+	return nil
+}
+
+func parseDSN(dsnRaw string) error {
+	dsn, err := url.Parse(dsnRaw)
+	if err != nil {
+		return ErrInvalidDSN
+	}
+	if schema := dsn.Scheme; schema != "postgres" {
+		return ErrDBNotImplemented
+	}
+
+	config.DB.User = dsn.User.Username()
+	config.DB.Password, _ = dsn.User.Password()
+	config.DB.Host = dsn.Host
+	config.DB.DBname = dsn.Path[1:]
+
+	if sslmode := dsn.Query().Get("sslmode"); sslmode != "" {
+		config.DB.SSLmode = sslmode
 	}
 
 	return nil
