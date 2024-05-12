@@ -9,6 +9,7 @@ type DB struct {
 	User     string
 	Password string
 	Host     string
+	Port     string
 	DBname   string
 	SSLmode  string
 }

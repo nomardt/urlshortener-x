@@ -30,8 +30,8 @@ func Run(config conf.Configuration) error {
 	router.Use(middleware.Compress(3))
 
 	if config.DB.Host != "" {
-		ps := fmt.Sprintf("host=%s user=%s password=%s dbname=%s sslmode=%s",
-			config.DB.Host, config.DB.User, config.DB.Password, config.DB.DBname, config.DB.SSLmode)
+		ps := fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=%s sslmode=%s",
+			config.DB.Host, config.DB.Port, config.DB.User, config.DB.Password, config.DB.DBname, config.DB.SSLmode)
 		db, err := sql.Open("pgx", ps)
 		if err != nil {
 			return err

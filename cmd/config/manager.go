@@ -80,8 +80,16 @@ func parseDSN(dsnRaw string) error {
 
 	config.DB.User = dsn.User.Username()
 	config.DB.Password, _ = dsn.User.Password()
-	config.DB.Host = dsn.Host
 	config.DB.DBname = dsn.Path[1:]
+
+	hostPort := strings.Split(dsn.Host, ":")
+	config.DB.Host = hostPort[0]
+
+	if len(hostPort) == 1 {
+		config.DB.Port = "5432"
+	} else {
+		config.DB.Port = hostPort[1]
+	}
 
 	if sslmode := dsn.Query().Get("sslmode"); sslmode != "" {
 		config.DB.SSLmode = sslmode
