@@ -1,15 +1,30 @@
 package urls
 
 import (
+	"bufio"
+	"encoding/json"
 	"errors"
+	"os"
 	"sync"
 
+	"github.com/google/uuid"
+	"go.uber.org/zap"
+
+	conf "github.com/nomardt/urlshortener-x/cmd/config"
 	urlsDomain "github.com/nomardt/urlshortener-x/internal/domain/urls"
+	"github.com/nomardt/urlshortener-x/internal/infra/logger"
 )
 
 type InMemoryRepo struct {
 	urls map[string]string
+	file string
 	mu   sync.Mutex
+}
+
+type urlInFile struct {
+	UUID        uuid.UUID `json:"uuid"`
+	ShortURL    string    `json:"short_url"`
+	OriginalURL string    `json:"original_url"`
 }
 
 var (
@@ -30,6 +45,23 @@ func (r *InMemoryRepo) SaveURL(url *urlsDomain.URL) error {
 
 	r.urls[url.ID()] = url.LongURL()
 
+	if file, err := os.OpenFile(r.file, os.O_WRONLY|os.O_APPEND, 0666); err == nil {
+		jsonURL := &urlInFile{
+			UUID:        uuid.New(),
+			ShortURL:    url.ID(),
+			OriginalURL: url.LongURL(),
+		}
+		data, err := json.Marshal(jsonURL)
+		if err != nil {
+			logger.Log.Info("Couldn't store the shortened URL in the file", zap.String("error", err.Error()))
+			return nil
+		}
+		data = append(data, '\n')
+
+		file.Write(data)
+		file.Close()
+	}
+
 	return nil
 }
 
@@ -43,4 +75,26 @@ func (r *InMemoryRepo) GetURL(id *string) (string, error) {
 	} else {
 		return "", ErrNotFoundURL
 	}
+}
+
+// Load previously shortened URLs from the file specified in config
+func (r *InMemoryRepo) LoadStoredURLs(config conf.Configuration) error {
+	r.file = config.StorageFile
+
+	file, err := os.Open(config.StorageFile)
+	if err != nil {
+		return err
+	}
+
+	scanner := bufio.NewScanner(file)
+	for scanner.Scan() {
+		line := scanner.Bytes()
+		url := &urlInFile{}
+		if err := json.Unmarshal(line, url); err != nil {
+			return err
+		}
+		r.urls[url.ShortURL] = url.OriginalURL
+	}
+
+	return nil
 }
