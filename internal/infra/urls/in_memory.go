@@ -3,7 +3,6 @@ package urls
 import (
 	"bufio"
 	"encoding/json"
-	"errors"
 	"os"
 	"sync"
 
@@ -27,15 +26,20 @@ type urlInFile struct {
 	OriginalURL string    `json:"original_url"`
 }
 
-var (
-	ErrNotFoundURL = errors.New("the URL with the specified id was not found")
-)
-
 // Create a new Repo which consists of urls map[string]string
-func NewInMemoryRepo() *InMemoryRepo {
-	return &InMemoryRepo{
+func NewInMemoryRepo(config conf.Configuration) *InMemoryRepo {
+	inMemoryRepo := &InMemoryRepo{
 		urls: make(map[string]string),
 	}
+	if err := inMemoryRepo.loadStoredURLs(config); err != nil {
+		logger.Log.Info("Couldn't recover any previously shortened URLs!", zap.String("error", err.Error()))
+
+		if _, err := os.Create(config.StorageFile); err != nil {
+			logger.Log.Info("No file will be created to store shortened URLs")
+		}
+	}
+
+	return inMemoryRepo
 }
 
 // Add the specified URL to the Repo
@@ -78,7 +82,7 @@ func (r *InMemoryRepo) GetURL(id *string) (string, error) {
 }
 
 // Load previously shortened URLs from the file specified in config
-func (r *InMemoryRepo) LoadStoredURLs(config conf.Configuration) error {
+func (r *InMemoryRepo) loadStoredURLs(config conf.Configuration) error {
 	r.file = config.StorageFile
 
 	file, err := os.Open(config.StorageFile)

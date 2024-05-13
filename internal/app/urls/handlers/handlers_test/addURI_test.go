@@ -44,9 +44,12 @@ func testPostRequest(t *testing.T, ts *httptest.Server, method,
 func Test_PostURI(t *testing.T) {
 	router := chi.NewRouter()
 	router.Use(middleware.AllowContentType("text/plain"))
-	urlsRepo := urlsInfra.NewInMemoryRepo()
 
-	urls.Setup(router, urlsRepo, newMockConfig("127.0.0.1:8080", ""))
+	config := newMockConfig("127.0.0.1:8080", "")
+
+	urlsRepo := urlsInfra.NewInMemoryRepo(config)
+
+	urls.Setup(router, urlsRepo, config)
 	ts := httptest.NewServer(router)
 	defer ts.Close()
 
