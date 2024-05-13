@@ -2,6 +2,7 @@ package urls
 
 import (
 	"bufio"
+	"context"
 	"encoding/json"
 	"os"
 	"sync"
@@ -78,6 +79,14 @@ func (r *InMemoryRepo) GetURL(id *string) (string, error) {
 		return url, nil
 	} else {
 		return "", ErrNotFoundURL
+	}
+}
+
+func (r *InMemoryRepo) Ping(_ context.Context) error {
+	if _, err := os.Stat(r.file); err != nil {
+		return err
+	} else {
+		return nil
 	}
 }
 

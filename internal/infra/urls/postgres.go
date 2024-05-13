@@ -51,8 +51,8 @@ func (r *PostgresRepo) GetURL(id *string) (string, error) {
 	getURL := `
 		SELECT full_uri FROM urls WHERE key = $1
 	`
-	var full_uri string
-	err := r.db.QueryRowContext(r.ctx, getURL, id).Scan(&full_uri)
+	var fullURI string
+	err := r.db.QueryRowContext(r.ctx, getURL, id).Scan(&fullURI)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return "", ErrNotFoundURL
@@ -62,7 +62,14 @@ func (r *PostgresRepo) GetURL(id *string) (string, error) {
 		return "", err
 	}
 
-	return full_uri, nil
+	return fullURI, nil
+}
+
+func (r *PostgresRepo) Ping(ctx context.Context) error {
+	if err := r.db.PingContext(r.ctx); err != nil {
+		return err
+	}
+	return nil
 }
 
 func (r *PostgresRepo) initializeDB(config conf.Configuration) error {
@@ -76,7 +83,7 @@ func (r *PostgresRepo) initializeDB(config conf.Configuration) error {
 	// defer r.db.Close()
 
 	r.ctx = context.Background()
-	if err = r.db.PingContext(r.ctx); err != nil {
+	if err = r.Ping(r.ctx); err != nil {
 		return err
 	}
 

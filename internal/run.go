@@ -1,6 +1,7 @@
 package internal
 
 import (
+	"context"
 	"net/http"
 
 	_ "github.com/jackc/pgx/v4/stdlib"
@@ -32,6 +33,16 @@ func Run(config conf.Configuration) error {
 	} else {
 		urlsRepo = urlsInfra.NewInMemoryRepo(config)
 	}
+
+	router.Get("/ping", logger.WithLogging(func(w http.ResponseWriter, r *http.Request) {
+		if err := urlsRepo.Ping(context.TODO()); err != nil {
+			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+			return
+		} else {
+			http.Error(w, "OK", http.StatusOK)
+			return
+		}
+	}))
 
 	urls.Setup(router, urlsRepo, config)
 

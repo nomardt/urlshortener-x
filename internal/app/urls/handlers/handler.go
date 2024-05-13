@@ -1,6 +1,8 @@
 package handlers
 
 import (
+	"context"
+
 	conf "github.com/nomardt/urlshortener-x/cmd/config"
 	urlsDomain "github.com/nomardt/urlshortener-x/internal/domain/urls"
 )
@@ -8,6 +10,7 @@ import (
 type Repository interface {
 	SaveURL(*urlsDomain.URL) error
 	GetURL(*string) (string, error)
+	Ping(ctx context.Context) error
 }
 
 type Handler struct {
