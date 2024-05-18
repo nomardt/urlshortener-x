@@ -11,9 +11,9 @@ import (
 func Setup(router *chi.Mux, urlsRepo handlers.Repository, config conf.Configuration) {
 	handler := handlers.NewHandler(urlsRepo, config)
 
-	router.Post("/", logger.WithLogging(handler.PostURI))
+	router.Post("/", logger.WithLogging(middlewares.OnlyPlaintextBody(handler.PostURI)))
 	router.Get("/{id}", logger.WithLogging(handler.GetURI))
 
-	router.Post("/api/shorten", logger.WithLogging(middlewares.OnlyJSON(handler.JSONPostURI)))
-	router.Post("/api/shorten/batch", logger.WithLogging(middlewares.OnlyJSON(handler.JSONPostBatch)))
+	router.Post("/api/shorten", logger.WithLogging(middlewares.OnlyJSONBody(handler.JSONPostURI)))
+	router.Post("/api/shorten/batch", logger.WithLogging(middlewares.OnlyJSONBody(handler.JSONPostBatch)))
 }

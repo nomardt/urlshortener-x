@@ -55,6 +55,14 @@ func (r *InMemoryRepo) SaveURL(url *urlsDomain.URL) error {
 		}
 	}
 
+	// Checking if the provided full URI is unique
+	for _, savedURL := range r.urls {
+		if savedURL.OriginalURL == url.LongURL() {
+			logger.Log.Info("The specified full URI already exists", zap.String("full_uri", url.LongURL()))
+			return newErrURINotUnique(savedURL.ShortURL)
+		}
+	}
+
 	r.urls = append(r.urls, urlInFile{url.CorrelationID(), url.ID(), url.LongURL()})
 
 	// Saving the new URL on the hard drive

@@ -11,7 +11,7 @@ import (
 )
 
 // This middleware should be used for endpoints designed only for JSON bodies
-func OnlyJSON(h http.HandlerFunc) http.HandlerFunc {
+func OnlyJSONBody(h http.HandlerFunc) http.HandlerFunc {
 	jsonFn := func(w http.ResponseWriter, r *http.Request) {
 		contentType := r.Header.Get("Content-Type")
 		if strings.Contains(contentType, "application/x-gzip") {

@@ -49,12 +49,27 @@ func (r *PostgresRepo) SaveURL(url *urlsDomain.URL) error {
 		logger.Log.Info("Couldn't prepare SELECT context", zap.Error(err))
 		return err
 	}
+	defer stmtCheckCorID.Close()
 
-	var exists string
-	err = stmtCheckCorID.QueryRowContext(r.ctx, url.CorrelationID()).Scan(&exists)
+	err = stmtCheckCorID.QueryRowContext(r.ctx, url.CorrelationID()).Scan(nil)
 	if !errors.Is(err, sql.ErrNoRows) {
 		logger.Log.Info("The specified correlation ID is not unique", zap.String("correlation_id", url.CorrelationID()), zap.Error(err))
 		return ErrCorIDNotUnique
+	}
+
+	// Checking if the provided full_uri is unique
+	stmtCheckFullURI, err := tx.PrepareContext(r.ctx, "SELECT key FROM urls WHERE full_uri = $1")
+	if err != nil {
+		logger.Log.Info("Couldn't prepare SELECT context", zap.Error(err))
+		return err
+	}
+	defer stmtCheckFullURI.Close()
+
+	var oldKey string
+	err = stmtCheckFullURI.QueryRowContext(r.ctx, url.LongURL()).Scan(&oldKey)
+	if !errors.Is(err, sql.ErrNoRows) {
+		logger.Log.Info("The specified full URL is not unique", zap.String("full_uri", url.LongURL()), zap.Error(err))
+		return newErrURINotUnique(oldKey)
 	}
 
 	// Adding the newly shortened URI to the database
@@ -68,6 +83,7 @@ func (r *PostgresRepo) SaveURL(url *urlsDomain.URL) error {
 		logger.Log.Info("Couldn't prepare INSERT context", zap.Error(err))
 		return err
 	}
+	defer stmtAddURL.Close()
 
 	_, err = stmtAddURL.ExecContext(r.ctx, url.CorrelationID(), url.ID(), url.LongURL())
 	if err != nil {
@@ -140,7 +156,7 @@ func (r *PostgresRepo) loadTable() error {
 		CREATE TABLE IF NOT EXISTS urls (
 			id VARCHAR(255) PRIMARY KEY DEFAULT gen_random_uuid()::text,
 			key VARCHAR(100) UNIQUE,
-			full_uri VARCHAR(1500),
+			full_uri VARCHAR(1500) UNIQUE,
 			created_at TIMESTAMP,
 			updated_at TIMESTAMP
 		)
