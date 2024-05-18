@@ -162,19 +162,16 @@ func (h *Handler) PostURI(w http.ResponseWriter, r *http.Request) {
 	id, err := shortenURL(string(body), h, "")
 	var errURINotUnique *urlsInfra.ErrURINotUnique
 	if errors.As(err, &errURINotUnique) {
+		w.WriteHeader(http.StatusConflict)
 		shortURL := "http://" + h.Configuration.ListenAddress + "/" + errURINotUnique.ExistingKey
-		http.Error(w, shortURL, http.StatusConflict)
+		w.Write([]byte(shortURL)) //nolint:all
 		return
 	} else if err != nil {
 		http.Error(w, "Please provide a valid URI in request body", http.StatusBadRequest)
 		logger.Log.Info("Couldn't shorten URL", zap.Error(err))
 		return
 	}
-	w.WriteHeader(http.StatusCreated)
 
-	_, err = w.Write([]byte("http://" + h.Configuration.ListenAddress + "/" + id))
-	if err != nil {
-		logger.Log.Info("Couldn't send the response with shortened URL address", zap.String("error", err.Error()))
-		return
-	}
+	w.WriteHeader(http.StatusCreated)
+	w.Write([]byte("http://" + h.Configuration.ListenAddress + "/" + id)) //nolint:all
 }
