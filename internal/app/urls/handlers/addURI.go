@@ -64,21 +64,6 @@ func shortenURL(urlInput string, h *Handler, correlationID string) (string, erro
 }
 
 func (h *Handler) JSONPostBatch(w http.ResponseWriter, r *http.Request) {
-	contentType := r.Header.Get("Content-Type")
-	if strings.Contains(contentType, "application/x-gzip") {
-		rg, err := gzip.NewReader(r.Body)
-		if err != nil {
-			http.Error(w, "Bad Request", http.StatusBadRequest)
-			logger.Log.Info("Couldn't decompress request body", zap.String("error", err.Error()))
-			return
-		}
-		defer rg.Close()
-		r.Body = rg
-	} else if !strings.Contains(contentType, "application/json") {
-		http.Error(w, "Please use only \"Content-Type: application/json\" for this endpoint!", http.StatusUnsupportedMediaType)
-		return
-	}
-
 	var clientInput []requestShortenBatchURLs
 	if err := json.NewDecoder(r.Body).Decode(&clientInput); err != nil {
 		http.Error(w, "You provided invalid JSON!", http.StatusBadRequest)
@@ -120,21 +105,6 @@ func (h *Handler) JSONPostBatch(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) JSONPostURI(w http.ResponseWriter, r *http.Request) {
-	contentType := r.Header.Get("Content-Type")
-	if strings.Contains(contentType, "application/x-gzip") {
-		rg, err := gzip.NewReader(r.Body)
-		if err != nil {
-			http.Error(w, "Bad Request", http.StatusBadRequest)
-			logger.Log.Info("Couldn't decompress request body", zap.String("error", err.Error()))
-			return
-		}
-		defer rg.Close()
-		r.Body = rg
-	} else if !strings.Contains(contentType, "application/json") {
-		http.Error(w, "Please use only \"Content-Type: application/json\" for this endpoint!", http.StatusUnsupportedMediaType)
-		return
-	}
-
 	var clientInput requestShortenURL
 	if err := json.NewDecoder(r.Body).Decode(&clientInput); err != nil {
 		http.Error(w, "You provided invalid JSON!", http.StatusBadRequest)

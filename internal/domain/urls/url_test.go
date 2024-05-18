@@ -19,7 +19,7 @@ func Test_NewURL(t *testing.T) {
 		{
 			name:    "Valid URL",
 			args:    args{longURL: "https://example.com/?abc", id: "aaa"},
-			want:    &URL{id: "aaa", longURL: "https://example.com/?abc"},
+			want:    &URL{correlationID: "aaa", id: "aaa", longURL: "https://example.com/?abc"},
 			wantErr: false,
 		},
 		{
