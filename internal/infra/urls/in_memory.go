@@ -7,7 +7,6 @@ import (
 	"os"
 	"sync"
 
-	"github.com/google/uuid"
 	"go.uber.org/zap"
 
 	conf "github.com/nomardt/urlshortener-x/cmd/config"
@@ -16,21 +15,21 @@ import (
 )
 
 type InMemoryRepo struct {
-	urls map[string]string
+	urls []urlInFile
 	file string
 	mu   sync.Mutex
 }
 
 type urlInFile struct {
-	UUID        uuid.UUID `json:"uuid"`
-	ShortURL    string    `json:"short_url"`
-	OriginalURL string    `json:"original_url"`
+	CorrelationID string `json:"correlation_id"`
+	ShortURL      string `json:"short_url"`
+	OriginalURL   string `json:"original_url"`
 }
 
 // Create a new Repo which consists of urls map[string]string
 func NewInMemoryRepo(config conf.Configuration) *InMemoryRepo {
 	inMemoryRepo := &InMemoryRepo{
-		urls: make(map[string]string),
+		urls: make([]urlInFile, 0),
 	}
 	if err := inMemoryRepo.loadStoredURLs(config); err != nil {
 		logger.Log.Info("Couldn't recover any previously shortened URLs!", zap.String("error", err.Error()))
@@ -48,13 +47,22 @@ func (r *InMemoryRepo) SaveURL(url *urlsDomain.URL) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
-	r.urls[url.ID()] = url.LongURL()
+	// Checking if the provided correlation ID is unique
+	for _, savedURL := range r.urls {
+		if savedURL.CorrelationID == url.CorrelationID() {
+			logger.Log.Info("The specified correlation ID already exists", zap.String("correlation_id", url.CorrelationID()))
+			return ErrCorIDNotUnique
+		}
+	}
 
+	r.urls = append(r.urls, urlInFile{url.CorrelationID(), url.ID(), url.LongURL()})
+
+	// Saving the new URL on the hard drive
 	if file, err := os.OpenFile(r.file, os.O_WRONLY|os.O_APPEND, 0666); err == nil {
 		jsonURL := &urlInFile{
-			UUID:        uuid.New(),
-			ShortURL:    url.ID(),
-			OriginalURL: url.LongURL(),
+			CorrelationID: url.CorrelationID(),
+			ShortURL:      url.ID(),
+			OriginalURL:   url.LongURL(),
 		}
 		data, err := json.Marshal(jsonURL)
 		if err != nil {
@@ -75,11 +83,13 @@ func (r *InMemoryRepo) GetURL(id *string) (string, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
-	if url := r.urls[*id]; url != "" {
-		return url, nil
-	} else {
-		return "", ErrNotFoundURL
+	for _, url := range r.urls {
+		if url.ShortURL == *id && url.OriginalURL != "" {
+			return url.OriginalURL, nil
+		}
 	}
+
+	return "", ErrNotFoundURL
 }
 
 func (r *InMemoryRepo) Ping(_ context.Context) error {
@@ -106,7 +116,8 @@ func (r *InMemoryRepo) loadStoredURLs(config conf.Configuration) error {
 		if err := json.Unmarshal(line, url); err != nil {
 			return err
 		}
-		r.urls[url.ShortURL] = url.OriginalURL
+
+		r.urls = append(r.urls, *url)
 	}
 
 	return nil

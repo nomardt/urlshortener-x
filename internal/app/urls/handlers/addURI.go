@@ -9,31 +9,46 @@ import (
 	"strings"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/nomardt/urlshortener-x/internal/domain/urls"
 	"github.com/nomardt/urlshortener-x/internal/infra/logger"
 	"go.uber.org/zap"
 )
 
-type request struct {
+type requestShortenURL struct {
 	URL string `json:"url"`
 }
 
-type response struct {
+type requestShortenBatchURLs struct {
+	CorrelationID string `json:"correlation_id"`
+	OriginalURL   string `json:"original_url"`
+}
+
+type responseShortenURL struct {
 	Result string `json:"result"`
 }
 
-func shortenURL(urlInput string, h *Handler) (string, error) {
+type responseShortenBatchURLs struct {
+	CorrelationID string `json:"correlation_id"`
+	ShortURL      string `json:"short_url"`
+}
+
+func shortenURL(urlInput string, h *Handler, correlationID string) (string, error) {
 	if urlInput == "" {
 		return "", errors.New("no URL provided")
+	}
+
+	if correlationID == "" {
+		correlationID = uuid.New().String()
 	}
 
 	var u *urls.URL
 	var err error
 	// If a key is predefined in config then store all shortened URLs at that path
 	if h.Configuration.Path == "" {
-		u, err = urls.NewURLWithoutID(urlInput)
+		u, err = urls.NewURLWithoutKey(urlInput, correlationID)
 	} else {
-		u, err = urls.NewURL(urlInput, h.Configuration.Path)
+		u, err = urls.NewURL(urlInput, h.Configuration.Path, correlationID)
 	}
 	if err != nil {
 		return "", errors.New("invalid URL")
@@ -48,6 +63,62 @@ func shortenURL(urlInput string, h *Handler) (string, error) {
 	return u.ID(), nil
 }
 
+func (h *Handler) JSONPostBatch(w http.ResponseWriter, r *http.Request) {
+	contentType := r.Header.Get("Content-Type")
+	if strings.Contains(contentType, "application/x-gzip") {
+		rg, err := gzip.NewReader(r.Body)
+		if err != nil {
+			http.Error(w, "Bad Request", http.StatusBadRequest)
+			logger.Log.Info("Couldn't decompress request body", zap.String("error", err.Error()))
+			return
+		}
+		defer rg.Close()
+		r.Body = rg
+	} else if !strings.Contains(contentType, "application/json") {
+		http.Error(w, "Please use only \"Content-Type: application/json\" for this endpoint!", http.StatusUnsupportedMediaType)
+		return
+	}
+
+	var clientInput []requestShortenBatchURLs
+	if err := json.NewDecoder(r.Body).Decode(&clientInput); err != nil {
+		http.Error(w, "You provided invalid JSON!", http.StatusBadRequest)
+		return
+	}
+
+	var resultingShortenedURLs []responseShortenBatchURLs
+	for _, url := range clientInput {
+		key, err := shortenURL(url.OriginalURL, h, url.CorrelationID)
+		if err != nil {
+			http.Error(w, "Bad Request", http.StatusBadRequest)
+			logger.Log.Info("Couldn't save URL sent in batch", zap.String("correlationID", url.CorrelationID))
+			return
+		}
+
+		shortURL := "http://" + h.Configuration.ListenAddress + "/" + key
+		newShortenedURL := responseShortenBatchURLs{
+			CorrelationID: url.CorrelationID,
+			ShortURL:      shortURL,
+		}
+
+		resultingShortenedURLs = append(resultingShortenedURLs, newShortenedURL)
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusCreated)
+
+	jsonResp, err := json.MarshalIndent(resultingShortenedURLs, "", "	")
+	if err != nil {
+		http.Error(w, "Something went wrong...", http.StatusInternalServerError)
+		logger.Log.Info("Couldn't create JSON", zap.String("error", err.Error()))
+		return
+	}
+	_, err = w.Write([]byte(jsonResp))
+	if err != nil {
+		logger.Log.Info("Couldn't send the response with shortened URL address", zap.String("error", err.Error()))
+		return
+	}
+}
+
 func (h *Handler) JSONPostURI(w http.ResponseWriter, r *http.Request) {
 	contentType := r.Header.Get("Content-Type")
 	if strings.Contains(contentType, "application/x-gzip") {
@@ -58,20 +129,19 @@ func (h *Handler) JSONPostURI(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		defer rg.Close()
-
 		r.Body = rg
 	} else if !strings.Contains(contentType, "application/json") {
 		http.Error(w, "Please use only \"Content-Type: application/json\" for this endpoint!", http.StatusUnsupportedMediaType)
 		return
 	}
 
-	var clientInput request
+	var clientInput requestShortenURL
 	if err := json.NewDecoder(r.Body).Decode(&clientInput); err != nil {
 		http.Error(w, "You provided invalid JSON!", http.StatusBadRequest)
 		return
 	}
 
-	id, err := shortenURL(clientInput.URL, h)
+	id, err := shortenURL(clientInput.URL, h, "")
 	if err != nil {
 		http.Error(w, "Bad Request", http.StatusBadRequest)
 		return
@@ -80,7 +150,7 @@ func (h *Handler) JSONPostURI(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusCreated)
 
 	resultingShortenedURL := "http://" + h.Configuration.ListenAddress + "/" + id
-	serverOutput := &response{
+	serverOutput := &responseShortenURL{
 		Result: resultingShortenedURL,
 	}
 	jsonResp, err := json.MarshalIndent(serverOutput, "", "	")
@@ -119,7 +189,7 @@ func (h *Handler) PostURI(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	id, err := shortenURL(string(body), h)
+	id, err := shortenURL(string(body), h, "")
 	if err != nil {
 		http.Error(w, "Bad Request", http.StatusBadRequest)
 		return

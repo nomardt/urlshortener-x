@@ -18,7 +18,7 @@ func Test_SaveURL(t *testing.T) {
 	repo := NewInMemoryRepo(newMockConfig("127.0.0.1:8080", ""))
 
 	// Test case: Save a URL
-	testURL, _ := urlsDomain.NewURL("https://example.com", "123")
+	testURL, _ := urlsDomain.NewURL("https://example.com", "123", "anything")
 	err := repo.SaveURL(testURL)
 	if err != nil {
 		t.Errorf("Expected no error, got: %v", err)
@@ -29,7 +29,7 @@ func Test_GetURL(t *testing.T) {
 	repo := NewInMemoryRepo(newMockConfig("127.0.0.1:8080", ""))
 
 	// Test case: Get existing URL
-	testURL, _ := urlsDomain.NewURL("https://example.com", "123")
+	testURL, _ := urlsDomain.NewURL("https://example.com", "123", "anything")
 	err := repo.SaveURL(testURL)
 	if err != nil {
 		t.Errorf("Expected no error, got: %v", err)

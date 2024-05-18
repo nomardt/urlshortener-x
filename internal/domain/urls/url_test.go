@@ -31,7 +31,7 @@ func Test_NewURL(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := NewURL(tt.args.longURL, tt.args.id)
+			got, err := NewURL(tt.args.longURL, tt.args.id, tt.args.id)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("NewURL() error = %v, wantErr %v", err, tt.wantErr)
 				return

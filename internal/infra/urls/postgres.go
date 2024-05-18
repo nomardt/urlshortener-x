@@ -36,23 +36,65 @@ func NewPostgresRepo(config conf.Configuration) *PostgresRepo {
 
 // Add the specified URL to the Repo
 func (r *PostgresRepo) SaveURL(url *urlsDomain.URL) error {
-	addURL := `
-		INSERT INTO urls (key, full_uri, created_at, updated_at)
-		VALUES ($1, $2, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+	tx, err := r.db.BeginTx(r.ctx, nil)
+	if err != nil {
+		logger.Log.Info("Couldn't begin transaction", zap.Error(err))
+		return err
+	}
+	defer tx.Rollback() //nolint:all
+
+	// Checking if the provided correlation ID is unique
+	stmtCheckCorID, err := tx.PrepareContext(r.ctx, "SELECT full_uri FROM urls WHERE id = $1")
+	if err != nil {
+		logger.Log.Info("Couldn't prepare SELECT context", zap.Error(err))
+		return err
+	}
+
+	var exists string
+	err = stmtCheckCorID.QueryRowContext(r.ctx, url.CorrelationID()).Scan(&exists)
+	if !errors.Is(err, sql.ErrNoRows) {
+		logger.Log.Info("The specified correlation ID is not unique", zap.String("correlation_id", url.CorrelationID()), zap.Error(err))
+		return ErrCorIDNotUnique
+	}
+
+	// Adding the newly shortened URI to the database
+	stmtAddURL, err := tx.PrepareContext(r.ctx, `
+		INSERT INTO urls (id, key, full_uri, created_at, updated_at)
+		VALUES ($1, $2, $3, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
 		ON CONFLICT (key) DO UPDATE
 		SET full_uri = EXCLUDED.full_uri, updated_at = CURRENT_TIMESTAMP
-	`
-	_, err := r.db.ExecContext(r.ctx, addURL, url.ID(), url.LongURL())
-	return err
+	`)
+	if err != nil {
+		logger.Log.Info("Couldn't prepare INSERT context", zap.Error(err))
+		return err
+	}
+
+	_, err = stmtAddURL.ExecContext(r.ctx, url.CorrelationID(), url.ID(), url.LongURL())
+	if err != nil {
+		logger.Log.Info("Couldn't execute INSERT context", zap.Error(err))
+		return err
+	}
+
+	return tx.Commit()
 }
 
 // Check if there is a URL stored in the Repo with the specified ID
-func (r *PostgresRepo) GetURL(id *string) (string, error) {
-	getURL := `
-		SELECT full_uri FROM urls WHERE key = $1
-	`
-	var fullURI string
-	err := r.db.QueryRowContext(r.ctx, getURL, id).Scan(&fullURI)
+func (r *PostgresRepo) GetURL(key *string) (string, error) {
+	tx, err := r.db.BeginTx(r.ctx, nil)
+	if err != nil {
+		return "", err
+	}
+	defer tx.Rollback() //nolint:all
+
+	stmtGetURL, err := tx.PrepareContext(r.ctx, "SELECT full_uri FROM urls WHERE key = $1")
+	if err != nil {
+		logger.Log.Info("Couldn't get full_uri with the specified key", zap.Error(err))
+		return "", err
+	}
+	defer stmtGetURL.Close()
+
+	var fullURL string
+	err = stmtGetURL.QueryRowContext(r.ctx, key).Scan(&fullURL)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return "", ErrNotFoundURL
@@ -62,11 +104,12 @@ func (r *PostgresRepo) GetURL(id *string) (string, error) {
 		return "", err
 	}
 
-	return fullURI, nil
+	return fullURL, tx.Commit()
 }
 
 func (r *PostgresRepo) Ping(ctx context.Context) error {
 	if err := r.db.PingContext(r.ctx); err != nil {
+		logger.Log.Info("Failed to ping the database", zap.Error(err))
 		return err
 	}
 	return nil
@@ -78,6 +121,7 @@ func (r *PostgresRepo) initializeDB(config conf.Configuration) error {
 	var err error
 	r.db, err = sql.Open("pgx", ps)
 	if err != nil {
+		logger.Log.Info("Couldn't open the database", zap.Error(err))
 		return err
 	}
 	// defer r.db.Close()
@@ -94,7 +138,7 @@ func (r *PostgresRepo) initializeDB(config conf.Configuration) error {
 func (r *PostgresRepo) loadTable() error {
 	urlsTable := `
 		CREATE TABLE IF NOT EXISTS urls (
-			id SERIAL PRIMARY KEY,
+			id VARCHAR(255) PRIMARY KEY DEFAULT gen_random_uuid()::text,
 			key VARCHAR(100) UNIQUE,
 			full_uri VARCHAR(1500),
 			created_at TIMESTAMP,
