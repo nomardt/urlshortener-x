@@ -2,6 +2,7 @@ package middlewares
 
 import (
 	"compress/gzip"
+	"encoding/json"
 	"net/http"
 	"strings"
 
@@ -9,6 +10,7 @@ import (
 	"go.uber.org/zap"
 )
 
+// This middleware should be used for endpoints designed only for JSON bodies
 func OnlyJSON(h http.HandlerFunc) http.HandlerFunc {
 	jsonFn := func(w http.ResponseWriter, r *http.Request) {
 		contentType := r.Header.Get("Content-Type")
@@ -20,6 +22,13 @@ func OnlyJSON(h http.HandlerFunc) http.HandlerFunc {
 				return
 			}
 			defer rg.Close()
+
+			var js json.RawMessage
+			if json.NewDecoder(rg).Decode(&js) != nil {
+				http.Error(w, "Please provide valid JSON for this endpoint!", http.StatusUnsupportedMediaType)
+				return
+			}
+
 			r.Body = rg
 		} else if !strings.Contains(contentType, "application/json") {
 			http.Error(w, "Please use only \"Content-Type: application/json\" for this endpoint!", http.StatusUnsupportedMediaType)
