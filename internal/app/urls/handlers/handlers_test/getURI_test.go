@@ -37,9 +37,12 @@ func testGetRequest(t *testing.T, ts *httptest.Server, method,
 func Test_GetURI(t *testing.T) {
 	router := chi.NewRouter()
 	router.Use(middleware.AllowContentType("text/plain"))
-	urlsRepo := urlsInfra.NewInMemoryRepo()
 
-	urls.Setup(router, urlsRepo, newMockConfig("127.0.0.1:8080", "path"))
+	config := newMockConfig("127.0.0.1:8080", "path")
+
+	urlsRepo := urlsInfra.NewInMemoryRepo(config)
+
+	urls.Setup(router, urlsRepo, config)
 	ts := httptest.NewServer(router)
 	defer ts.Close()
 

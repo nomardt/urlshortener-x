@@ -19,7 +19,7 @@ func Test_NewURL(t *testing.T) {
 		{
 			name:    "Valid URL",
 			args:    args{longURL: "https://example.com/?abc", id: "aaa"},
-			want:    &URL{id: "aaa", longURL: "https://example.com/?abc"},
+			want:    &URL{correlationID: "aaa", id: "aaa", longURL: "https://example.com/?abc"},
 			wantErr: false,
 		},
 		{
@@ -31,7 +31,7 @@ func Test_NewURL(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := NewURL(tt.args.longURL, tt.args.id)
+			got, err := NewURL(tt.args.longURL, tt.args.id, tt.args.id)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("NewURL() error = %v, wantErr %v", err, tt.wantErr)
 				return

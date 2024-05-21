@@ -8,8 +8,9 @@ import (
 )
 
 type URL struct {
-	id      string
-	longURL string
+	correlationID string
+	id            string
+	longURL       string
 }
 
 var (
@@ -17,20 +18,21 @@ var (
 )
 
 // Creates a new URL object with the URL provided
-func NewURLWithoutID(longURL string) (*URL, error) {
+func NewURLWithoutKey(longURL string, correlationID string) (*URL, error) {
 	id := generateRandomID(8)
-	return NewURL(longURL, id)
+	return NewURL(longURL, id, correlationID)
 }
 
 // Create a new URL object when you know which ID to use
-func NewURL(longURL string, id string) (*URL, error) {
+func NewURL(longURL string, key string, correlationID string) (*URL, error) {
 	if err := validateURL(longURL); err != nil {
 		return nil, err
 	}
 
 	return &URL{
-		id:      id,
-		longURL: longURL,
+		correlationID: correlationID,
+		id:            key,
+		longURL:       longURL,
 	}, nil
 }
 
@@ -40,6 +42,10 @@ func (u *URL) ID() string {
 
 func (u *URL) LongURL() string {
 	return u.longURL
+}
+
+func (u *URL) CorrelationID() string {
+	return u.correlationID
 }
 
 func validateURL(rawURL string) error {

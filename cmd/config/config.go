@@ -5,22 +5,34 @@ import (
 	"os"
 )
 
+type DB struct {
+	User     string
+	Password string
+	Host     string
+	Port     string
+	DBname   string
+	SSLmode  string
+}
+
 type Configuration struct {
 	ListenAddress string
 	Path          string
 	StorageFile   string
+	DB            DB
 }
 
 var config = Configuration{
 	ListenAddress: "127.0.0.1:8080",
 	Path:          "",
 	StorageFile:   "",
+	DB:            DB{SSLmode: "disable"},
 }
 
 func LoadConfig() (Configuration, error) {
 	flag.Func("a", "Specify the IP:PORT you want to start the server at (e.g. 127.0.0.1:8888)", setListenAddress)
 	flag.Func("b", "Specify the full URI you want to access the shortened URIs at (e.g. http://localhost:8888/defaultPath)", setURL)
-	flag.StringVar(&config.StorageFile, "f", "/tmp/short-url-db.json", "Specify the database file")
+	flag.Func("d", "Specify the Database Source Name (e.g. postgres://username:password@localhost:5432/mydatabase?sslmode=disable)", parseDSN)
+	flag.StringVar(&config.StorageFile, "f", "/tmp/short-url-db.json", "Specify the file where shortened URLs will be stored")
 	flag.Parse()
 
 	if envServerAddress := os.Getenv("SERVER_ADDRESS"); envServerAddress != "" {
@@ -30,6 +42,13 @@ func LoadConfig() (Configuration, error) {
 		}
 	} else if envBaseURL := os.Getenv("BASE_URL"); envBaseURL != "" {
 		err := setURL(envBaseURL)
+		if err != nil {
+			return config, err
+		}
+	}
+
+	if envDSN := os.Getenv("DATABASE_DSN"); envDSN != "" {
+		err := parseDSN(envDSN)
 		if err != nil {
 			return config, err
 		}
