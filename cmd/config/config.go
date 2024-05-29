@@ -19,20 +19,24 @@ type Configuration struct {
 	Path          string
 	StorageFile   string
 	DB            DB
+	Secret        string
 }
+
+var HARDCODED_SECRET = "CHANGEMEPLZ!"
 
 var config = Configuration{
 	ListenAddress: "127.0.0.1:8080",
 	Path:          "",
 	StorageFile:   "",
 	DB:            DB{SSLmode: "disable"},
+	Secret:        HARDCODED_SECRET,
 }
 
 func LoadConfig() (Configuration, error) {
 	flag.Func("a", "Specify the IP:PORT you want to start the server at (e.g. 127.0.0.1:8888)", setListenAddress)
 	flag.Func("b", "Specify the full URI you want to access the shortened URIs at (e.g. http://localhost:8888/defaultPath)", setURL)
 	flag.Func("d", "Specify the Database Source Name (e.g. postgres://username:password@localhost:5432/mydatabase?sslmode=disable)", parseDSN)
-	flag.StringVar(&config.StorageFile, "f", "/tmp/short-url-db.json", "Specify the file where shortened URLs will be stored")
+	flag.StringVar(&config.StorageFile, "f", "/tmp/short-url-db.json", "Specify the file where shortened URLs will be stored (default: /tmp/short-url-db.json)")
 	flag.Parse()
 
 	if envServerAddress := os.Getenv("SERVER_ADDRESS"); envServerAddress != "" {

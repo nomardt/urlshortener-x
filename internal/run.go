@@ -12,7 +12,8 @@ import (
 
 	conf "github.com/nomardt/urlshortener-x/cmd/config"
 	"github.com/nomardt/urlshortener-x/internal/app/urls"
-	"github.com/nomardt/urlshortener-x/internal/app/urls/handlers"
+	urlsDomain "github.com/nomardt/urlshortener-x/internal/domain/urls"
+	"github.com/nomardt/urlshortener-x/internal/infra/auth"
 	"github.com/nomardt/urlshortener-x/internal/infra/logger"
 	urlsInfra "github.com/nomardt/urlshortener-x/internal/infra/urls"
 )
@@ -26,15 +27,17 @@ func Run(config conf.Configuration) error {
 
 	router.Use(middleware.AllowContentType("text/plain", "application/json", "application/x-gzip"))
 	router.Use(middleware.Compress(3))
+	router.Use(logger.WithLogging())
+	router.Use(auth.WithAuth(config.Secret))
 
-	var urlsRepo handlers.Repository
+	var urlsRepo urlsDomain.Repository
 	if config.DB.Host != "" {
 		urlsRepo = urlsInfra.NewPostgresRepo(config)
 	} else {
 		urlsRepo = urlsInfra.NewInMemoryRepo(config)
 	}
 
-	router.Get("/ping", logger.WithLogging(func(w http.ResponseWriter, r *http.Request) {
+	router.Get("/ping", func(w http.ResponseWriter, r *http.Request) {
 		if err := urlsRepo.Ping(context.TODO()); err != nil {
 			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 			return
@@ -42,7 +45,7 @@ func Run(config conf.Configuration) error {
 			http.Error(w, "OK", http.StatusOK)
 			return
 		}
-	}))
+	})
 
 	urls.Setup(router, urlsRepo, config)
 

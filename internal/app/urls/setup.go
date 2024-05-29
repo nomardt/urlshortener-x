@@ -5,15 +5,16 @@ import (
 	conf "github.com/nomardt/urlshortener-x/cmd/config"
 	"github.com/nomardt/urlshortener-x/internal/app/urls/handlers"
 	"github.com/nomardt/urlshortener-x/internal/app/urls/middlewares"
-	"github.com/nomardt/urlshortener-x/internal/infra/logger"
+	urlsDomain "github.com/nomardt/urlshortener-x/internal/domain/urls"
 )
 
-func Setup(router *chi.Mux, urlsRepo handlers.Repository, config conf.Configuration) {
+func Setup(router *chi.Mux, urlsRepo urlsDomain.Repository, config conf.Configuration) {
 	handler := handlers.NewHandler(urlsRepo, config)
 
-	router.Post("/", logger.WithLogging(middlewares.OnlyPlaintextBody(handler.PostURI)))
-	router.Get("/{id}", logger.WithLogging(handler.GetURI))
+	router.Get("/{id}", handler.GetURI)
+	router.Get("/api/user/urls", handler.GetUserURLs)
 
-	router.Post("/api/shorten", logger.WithLogging(middlewares.OnlyJSONBody(handler.JSONPostURI)))
-	router.Post("/api/shorten/batch", logger.WithLogging(middlewares.OnlyJSONBody(handler.JSONPostBatch)))
+	router.Post("/", middlewares.OnlyPlaintextBody(handler.PostURI))
+	router.Post("/api/shorten", middlewares.OnlyJSONBody(handler.JSONPostURI))
+	router.Post("/api/shorten/batch", middlewares.OnlyJSONBody(handler.JSONPostBatch))
 }

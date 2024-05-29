@@ -1,3 +1,3 @@
 # urlshortener-x
 
-URL shortening service
+URL shortening web app. Features: postgres, JWT authentication
