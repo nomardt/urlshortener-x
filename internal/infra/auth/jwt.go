@@ -15,14 +15,14 @@ type Claims struct {
 	UserID uuid.UUID
 }
 
-const JWT_EXPIRES_IN = 24 * time.Hour
+const jwtExpiresIn = 24 * time.Hour
 
 func newJWT(secret string) (string, error) {
 	userID := uuid.New()
 
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, Claims{
 		RegisteredClaims: jwt.RegisteredClaims{
-			ExpiresAt: jwt.NewNumericDate(time.Now().Add(JWT_EXPIRES_IN)),
+			ExpiresAt: jwt.NewNumericDate(time.Now().Add(jwtExpiresIn)),
 		},
 		UserID: userID,
 	})

@@ -6,15 +6,23 @@ import (
 	"github.com/nomardt/urlshortener-x/internal/app/urls/handlers"
 	"github.com/nomardt/urlshortener-x/internal/app/urls/middlewares"
 	urlsDomain "github.com/nomardt/urlshortener-x/internal/domain/urls"
+	"github.com/nomardt/urlshortener-x/internal/infra/auth"
 )
 
 func Setup(router *chi.Mux, urlsRepo urlsDomain.Repository, config conf.Configuration) {
 	handler := handlers.NewHandler(urlsRepo, config)
 
 	router.Get("/{id}", handler.GetURI)
-	router.Get("/api/user/urls", handler.GetUserURLs)
-
 	router.Post("/", middlewares.OnlyPlaintextBody(handler.PostURI))
-	router.Post("/api/shorten", middlewares.OnlyJSONBody(handler.JSONPostURI))
-	router.Post("/api/shorten/batch", middlewares.OnlyJSONBody(handler.JSONPostBatch))
+
+	router.Route("/api", func(router chi.Router) {
+		router.Route("/shorten", func(router chi.Router) {
+			router.Post("/", middlewares.OnlyJSONBody(auth.WithAuth(handler.JSONPostURI, config.Secret)))
+			router.Post("/batch", middlewares.OnlyJSONBody(auth.WithAuth(handler.JSONPostBatch, config.Secret)))
+		})
+
+		router.Route("/user", func(router chi.Router) {
+			router.Get("/urls", auth.TokenNecessary(handler.GetUserURLs, config.Secret))
+		})
+	})
 }

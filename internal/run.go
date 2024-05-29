@@ -13,7 +13,6 @@ import (
 	conf "github.com/nomardt/urlshortener-x/cmd/config"
 	"github.com/nomardt/urlshortener-x/internal/app/urls"
 	urlsDomain "github.com/nomardt/urlshortener-x/internal/domain/urls"
-	"github.com/nomardt/urlshortener-x/internal/infra/auth"
 	"github.com/nomardt/urlshortener-x/internal/infra/logger"
 	urlsInfra "github.com/nomardt/urlshortener-x/internal/infra/urls"
 )
@@ -28,7 +27,6 @@ func Run(config conf.Configuration) error {
 	router.Use(middleware.AllowContentType("text/plain", "application/json", "application/x-gzip"))
 	router.Use(middleware.Compress(3))
 	router.Use(logger.WithLogging())
-	router.Use(auth.WithAuth(config.Secret))
 
 	var urlsRepo urlsDomain.Repository
 	if config.DB.Host != "" {

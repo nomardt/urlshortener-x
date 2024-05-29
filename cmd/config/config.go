@@ -22,14 +22,14 @@ type Configuration struct {
 	Secret        string
 }
 
-var HARDCODED_SECRET = "CHANGEMEPLZ!"
+const hardcodedSecret = "CHANGEMEPLZ!"
 
 var config = Configuration{
 	ListenAddress: "127.0.0.1:8080",
 	Path:          "",
 	StorageFile:   "",
 	DB:            DB{SSLmode: "disable"},
-	Secret:        HARDCODED_SECRET,
+	Secret:        hardcodedSecret,
 }
 
 func LoadConfig() (Configuration, error) {

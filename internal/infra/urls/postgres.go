@@ -251,6 +251,11 @@ func (r *PostgresRepo) GetAllUserURLs(userID string) (map[string]string, error) 
 		urls[key] = fullURI
 	}
 
+	if err := rows.Err(); err != nil {
+		logger.Log.Info("Error occured during rows iteration", zap.Error(err))
+		return nil, err
+	}
+
 	return urls, tx.Commit()
 }
 
