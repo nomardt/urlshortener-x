@@ -57,6 +57,7 @@ func (h *Handler) GetUserURLs(w http.ResponseWriter, r *http.Request) {
 
 	allURLs := []responseUserURL{}
 	for shortURL, originalURL := range allURLsMap {
+		shortURL = "http://" + h.ListenAddress + "/" + shortURL
 		allURLs = append(allURLs, responseUserURL{ShortURL: shortURL, OriginalURL: originalURL})
 	}
 
