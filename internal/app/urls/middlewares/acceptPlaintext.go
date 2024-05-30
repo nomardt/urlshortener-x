@@ -9,7 +9,7 @@ import (
 	"go.uber.org/zap"
 )
 
-// This middleware should be used for endpoints designed only for plaintext endpoints
+// This middleware should be used for endpoints designed only for plaintext bodies
 func OnlyPlaintextBody(h http.HandlerFunc) http.HandlerFunc {
 	plainFn := func(w http.ResponseWriter, r *http.Request) {
 		contentType := r.Header.Get("Content-Type")
