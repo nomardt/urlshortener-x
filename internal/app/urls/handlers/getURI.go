@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"strings"
 
 	"github.com/go-chi/chi/v5"
 	"go.uber.org/zap"
@@ -34,10 +35,11 @@ func (h *Handler) GetURI(w http.ResponseWriter, r *http.Request) {
 // Get all URLs associated with the current user
 func (h *Handler) GetUserURLs(w http.ResponseWriter, r *http.Request) {
 	// Handle the session cookie
-	jwtCookie, _ := r.Cookie("jwt_session") // No need to check if cookie is present because it is done by middleware
-	userID, err := auth.GetUserID(jwtCookie.Value, h.Secret)
+	jwtCookie := r.Header.Get("Authorization") // No need to check if cookie is present because it is done by middleware
+	jwtCookie, _ = strings.CutPrefix(jwtCookie, "Bearer ")
+	userID, err := auth.GetUserID(jwtCookie, h.Secret)
 	if err != nil {
-		logger.Log.Info("Couldn't decrypt the cookie", zap.String("jwt_session", jwtCookie.Value), zap.Error(err))
+		logger.Log.Info("Couldn't decrypt the cookie", zap.String("jwt_session", jwtCookie), zap.Error(err))
 		http.Error(w, "Unathorized", http.StatusUnauthorized)
 	}
 
