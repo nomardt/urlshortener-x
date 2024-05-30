@@ -80,7 +80,7 @@ func (h *Handler) JSONPostBatch(w http.ResponseWriter, r *http.Request) {
 	jwtCookie, _ = strings.CutPrefix(jwtCookie, "Bearer ")
 	userID, err := auth.GetUserID(jwtCookie, h.Secret)
 	if err != nil {
-		logger.Log.Info("Couldn't decrypt the cookie", zap.String("jwt_session", jwtCookie), zap.Error(err))
+		logger.Log.Info("Couldn't decrypt the cookie", zap.String("Authorization", jwtCookie), zap.Error(err))
 		http.Error(w, "Unathorized", http.StatusUnauthorized)
 	}
 
@@ -145,7 +145,7 @@ func (h *Handler) JSONPostURI(w http.ResponseWriter, r *http.Request) {
 	jwtCookie, _ = strings.CutPrefix(jwtCookie, "Bearer ")
 	userID, err := auth.GetUserID(jwtCookie, h.Secret)
 	if err != nil {
-		logger.Log.Info("Couldn't decrypt the cookie", zap.String("jwt_session", jwtCookie), zap.Error(err))
+		logger.Log.Info("Couldn't decrypt the cookie", zap.String("Authorization", jwtCookie), zap.Error(err))
 		http.Error(w, "Unathorized", http.StatusUnauthorized)
 	}
 
