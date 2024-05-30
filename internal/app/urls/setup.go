@@ -12,17 +12,20 @@ import (
 func Setup(router *chi.Mux, urlsRepo urlsDomain.Repository, config conf.Configuration) {
 	handler := handlers.NewHandler(urlsRepo, config)
 
-	router.Get("/{id}", handler.GetURI)
-	router.Post("/", middlewares.OnlyPlaintextBody(handler.PostURI))
+	router.Group(func(r chi.Router) {
+		r.Use(auth.WithAuth(config.Secret))
 
-	router.Route("/api", func(router chi.Router) {
-		router.Route("/shorten", func(router chi.Router) {
-			router.Post("/", middlewares.OnlyJSONBody(auth.WithAuth(handler.JSONPostURI, config.Secret)))
-			router.Post("/batch", middlewares.OnlyJSONBody(auth.WithAuth(handler.JSONPostBatch, config.Secret)))
-		})
+		r.Post("/", middlewares.OnlyPlaintextBody(handler.PostURI))
 
-		router.Route("/user", func(router chi.Router) {
-			router.Get("/urls", auth.TokenNecessary(handler.GetUserURLs, config.Secret))
-		})
+		r.Post("/api/shorten", middlewares.OnlyJSONBody(handler.JSONPostURI))
+		r.Post("/api/shorten/batch", middlewares.OnlyJSONBody(handler.JSONPostBatch))
 	})
+
+	router.Group(func(r chi.Router) {
+		r.Use(auth.TokenNecessary(config.Secret))
+
+		r.Get("/api/user/urls", handler.GetUserURLs)
+	})
+
+	router.Get("/{id}", handler.GetURI)
 }
