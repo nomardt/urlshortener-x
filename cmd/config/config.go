@@ -36,7 +36,7 @@ func LoadConfig() (Configuration, error) {
 	flag.Func("a", "Specify the IP:PORT you want to start the server at (e.g. 127.0.0.1:8888)", setListenAddress)
 	flag.Func("b", "[DEBUG] Specify the full URI you want to access the shortened URI at (e.g. http://localhost:8888/shortPath)", setURL)
 	flag.Func("d", "Specify the Database Source Name (e.g. postgres://username:password@localhost:5432/mydatabase?sslmode=disable)", parseDSN)
-	flag.StringVar(&config.StorageFile, "f", "/tmp/short-url-db.json", "Specify the file where shortened URLs will be stored (default: /tmp/short-url-db.json)")
+	flag.StringVar(&config.StorageFile, "f", "/tmp/short-url-db.json", "Specify the file where shortened URLs will be stored")
 	flag.Parse()
 
 	if envServerAddress := os.Getenv("SERVER_ADDRESS"); envServerAddress != "" {

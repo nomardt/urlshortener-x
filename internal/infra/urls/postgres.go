@@ -7,6 +7,9 @@ import (
 	"fmt"
 	"log"
 
+	"github.com/golang-migrate/migrate/v4"
+	"github.com/golang-migrate/migrate/v4/database/postgres"
+	_ "github.com/golang-migrate/migrate/v4/source/file"
 	conf "github.com/nomardt/urlshortener-x/cmd/config"
 	urlsDomain "github.com/nomardt/urlshortener-x/internal/domain/urls"
 	"github.com/nomardt/urlshortener-x/internal/infra/logger"
@@ -39,38 +42,29 @@ func (r *PostgresRepo) initializeDB(config conf.Configuration) error {
 	return nil
 }
 
-// Creates table urls with fields id, key, full_uri, users if not already present
+// Executes migrations
 func (r *PostgresRepo) loadTable() error {
-	tx, err := r.db.BeginTx(r.ctx, nil)
+	driver, err := postgres.WithInstance(r.db, &postgres.Config{})
 	if err != nil {
-		logger.Log.Info("Couldn't begin transaction", zap.Error(err))
-		return err
-	}
-	defer tx.Rollback() //nolint:all
-
-	stmtCreateURLsTable, err := tx.PrepareContext(r.ctx, `
-		CREATE TABLE IF NOT EXISTS urls (
-			id VARCHAR(255) PRIMARY KEY DEFAULT gen_random_uuid()::text UNIQUE,
-			key VARCHAR(100),
-			full_uri VARCHAR(1500) UNIQUE,
-			users TEXT[],
-			created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-			updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-		)
-	`)
-	if err != nil {
-		logger.Log.Info("Couldn't prepare statement for table urls creation", zap.Error(err))
-		return err
-	}
-	defer stmtCreateURLsTable.Close()
-
-	_, err = stmtCreateURLsTable.ExecContext(r.ctx)
-	if err != nil {
-		logger.Log.Info("Couldn't create table urls", zap.Error(err))
+		logger.Log.Info("Failed to create migrate driver", zap.Error(err))
 		return err
 	}
 
-	return tx.Commit()
+	m, err := migrate.NewWithDatabaseInstance(
+		"file://migrations",
+		"url", driver)
+	if err != nil {
+		logger.Log.Info("Failed to create a new Migrate instance", zap.Error(err))
+		return err
+	}
+
+	err = m.Up()
+	if err != nil && err != migrate.ErrNoChange {
+		logger.Log.Info("Failed to migrate", zap.Error(err))
+		return err
+	}
+
+	return nil
 }
 
 // Initializes the database, creates table urls if not present and returns
