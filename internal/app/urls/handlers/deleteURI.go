@@ -78,7 +78,11 @@ func (h *Handler) JSONDeleteBatch(w http.ResponseWriter, r *http.Request) {
 	}
 
 	jwtCookie := r.Header.Get("Authorization")
-	jwtCookie, _ = strings.CutPrefix(jwtCookie, "Bearer ")
+	jwtCookie, found := strings.CutPrefix(jwtCookie, "Bearer ")
+	if !found {
+		w.WriteHeader(http.StatusAccepted)
+		return
+	}
 	userID, err := auth.GetUserID(jwtCookie, h.Secret)
 	if err != nil {
 		logger.Log.Info("Couldn't decrypt the cookie", zap.String("Authorization", jwtCookie), zap.Error(err))

@@ -19,13 +19,14 @@ func Setup(router *chi.Mux, urlsRepo urlsDomain.Repository, config conf.Configur
 
 		r.Post("/api/shorten", middlewares.OnlyJSONBody(handler.JSONPostURI))
 		r.Post("/api/shorten/batch", middlewares.OnlyJSONBody(handler.JSONPostBatch))
+
+		r.Delete("/api/user/urls", middlewares.OnlyJSONBody(handler.JSONDeleteBatch))
 	})
 
 	router.Group(func(r chi.Router) {
 		r.Use(auth.TokenNecessary(config.Secret))
 
 		r.Get("/api/user/urls", handler.GetUserURLs)
-		r.Delete("/api/user/urls", middlewares.OnlyJSONBody(handler.JSONDeleteBatch))
 	})
 
 	router.Get("/{id}", handler.GetURI)
