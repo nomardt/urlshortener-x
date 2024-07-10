@@ -1,36 +1,44 @@
 package handlers_test
 
 import (
-	"encoding/json"
-	"errors"
 	"io"
 	"net/http"
 	"net/http/httptest"
-	"os"
 	"testing"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
-	"github.com/google/uuid"
 	"github.com/nomardt/urlshortener-x/internal/app/urls"
-	"github.com/nomardt/urlshortener-x/internal/infra/auth"
 	urlsInfra "github.com/nomardt/urlshortener-x/internal/infra/urls"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-type userURLsResponse struct {
-	ShortURL    string `json:"short_url"`
-	OriginalURL string `json:"original_url"`
+func testGetRequest(t *testing.T, ts *httptest.Server, method,
+	path string) (*http.Response, string) {
+	req, err := http.NewRequest(method, ts.URL+path, nil)
+	require.NoError(t, err)
+
+	client := ts.Client()
+	// Preventing the client from following the redirect, ErrUseLastResponse returns nil as err
+	client.CheckRedirect = func(req *http.Request, via []*http.Request) error {
+		return http.ErrUseLastResponse
+	}
+	resp, err := client.Do(req)
+	require.NoError(t, err)
+	defer resp.Body.Close()
+
+	respBody, err := io.ReadAll(resp.Body)
+	require.NoError(t, err)
+
+	return resp, string(respBody)
 }
 
 func Test_GetURI(t *testing.T) {
 	router := chi.NewRouter()
 	router.Use(middleware.AllowContentType("text/plain"))
-	router.Use(auth.WithAuth("hardcodedSecret"))
 
-	storageFile := "/tmp/" + uuid.New().String() + ".json"
-	config := newMockConfig("127.0.0.1:8888", "tesst", storageFile)
+	config := newMockConfig("127.0.0.1:8080", "path")
 
 	urlsRepo := urlsInfra.NewInMemoryRepo(config)
 
@@ -38,126 +46,47 @@ func Test_GetURI(t *testing.T) {
 	ts := httptest.NewServer(router)
 	defer ts.Close()
 
-	testCases := []struct {
-		name        string
-		requestBody string
-	}{
-		{
-			name:        "all OK",
-			requestBody: "https://example.com",
-		},
+	type args struct {
+		requestPath string
 	}
-
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			// Adding new URL to the db
-			resp, _ := testPostRequest(t, ts, http.MethodPost, "", "text/plain", tc.requestBody)
-			defer resp.Body.Close()
-
-			assert.Equal(t, 201, resp.StatusCode)
-
-			// Testing shortened URL retrieval
-			client := &http.Client{
-				CheckRedirect: func(req *http.Request, via []*http.Request) error {
-					// Return an error to prevent following the redirect
-					return http.ErrUseLastResponse
-				},
-			}
-			resp2, err := client.Get(ts.URL + "/tesst")
-			require.NoError(t, err)
-			defer resp2.Body.Close()
-
-			resp2Body, err := io.ReadAll(resp2.Body)
-			require.NoError(t, err)
-
-			redirect := resp2.Header.Get("Location")
-			assert.Equal(t, 307, resp2.StatusCode)
-			assert.Equal(t, tc.requestBody, redirect)
-			assert.Equal(t, "", string(resp2Body))
-		})
-	}
-
-	err := os.Remove(storageFile)
-	if err != nil {
-		t.Errorf("Couldn't cleanup the db file. Please remove '%s' manually", err)
-	}
-}
-
-func Test_GetUserURLs(t *testing.T) {
-	router := chi.NewRouter()
-	router.Use(middleware.AllowContentType("text/plain"))
-	router.Use(auth.WithAuth("hardcodedSecret"))
-
-	storageFile := "/tmp/" + uuid.New().String() + ".json"
-	config := newMockConfig("127.0.0.1:8888", "tesst", storageFile)
-
-	urlsRepo := urlsInfra.NewInMemoryRepo(config)
-
-	urls.Setup(router, urlsRepo, config)
-	ts := httptest.NewServer(router)
-	defer ts.Close()
 
 	testCases := []struct {
 		name         string
-		requestBody  string
-		responseBody string
+		method       string
+		expectedCode int
+		args         args
 	}{
 		{
-			name:        "all OK",
-			requestBody: "https://example.com",
-			responseBody: `[
-				{
-					"short_url": "http://127.0.0.1:8888/tesst",
-					"original_url": "https://example.com"
-				}
-			]`,
+			name:         "POST instead of GET",
+			method:       http.MethodPost,
+			expectedCode: http.StatusMethodNotAllowed,
+			args:         args{"/path"},
+		},
+		{
+			name:         "GET, all ok",
+			method:       http.MethodGet,
+			expectedCode: http.StatusTemporaryRedirect,
+			args:         args{"/path"},
+		},
+		{
+			name:         "GET, invalid path",
+			method:       http.MethodGet,
+			expectedCode: http.StatusBadRequest,
+			args:         args{"/invalidpath"},
 		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			// Adding new URL to the db
-			resp, _ := testPostRequest(t, ts, http.MethodPost, "", "text/plain", tc.requestBody)
-			defer resp.Body.Close()
+			// Adding a shortened URL at /path
+			req, _ := testPostRequest(t, ts, "POST", "/", "text/plain", "https://example.com")
+			req.Body.Close()
 
-			assert.Equal(t, 201, resp.StatusCode)
+			req, _ = testGetRequest(t, ts, tc.method, tc.args.requestPath)
+			defer req.Body.Close()
 
-			auth := resp.Header.Get("Authorization")
-			if auth == "" {
-				assert.Error(t, errors.New("no authorization in response"))
-			}
-
-			// Testing shortened URL retrieval
-			req2, err := http.NewRequest(http.MethodGet, ts.URL+"/api/user/urls", nil)
-			require.NoError(t, err)
-			req2.Header.Add("Authorization", auth)
-
-			resp2, err := ts.Client().Do(req2)
-			require.NoError(t, err)
-			defer resp2.Body.Close()
-
-			resp2Body, err := io.ReadAll(resp2.Body)
-			require.NoError(t, err)
-
-			assert.Equal(t, 200, resp2.StatusCode)
-
-			var respExpected []userURLsResponse
-			err = json.Unmarshal([]byte(tc.responseBody), &respExpected)
-			if err != nil {
-				t.Error(err)
-			}
-			var respActual []userURLsResponse
-			err = json.Unmarshal(resp2Body, &respActual)
-			if err != nil {
-				t.Error(err)
-			}
-
-			assert.Equal(t, respExpected, respActual)
+			assert.Equal(t, tc.expectedCode, req.StatusCode)
 		})
 	}
 
-	err := os.Remove(storageFile)
-	if err != nil {
-		t.Errorf("Couldn't cleanup the db file. Please remove '%s' manually", err)
-	}
 }

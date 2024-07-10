@@ -1,7 +1,6 @@
 package urls
 
 import (
-	"context"
 	"errors"
 	"math/rand"
 	"net/url"
@@ -12,13 +11,6 @@ type URL struct {
 	correlationID string
 	id            string
 	longURL       string
-}
-
-type Repository interface {
-	SaveURL(url URL, userID string) error
-	GetURL(key string) (string, error)
-	GetAllUserURLs(userID string) (map[string]string, error)
-	Ping(ctx context.Context) error
 }
 
 var (
