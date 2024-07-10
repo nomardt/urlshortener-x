@@ -62,7 +62,7 @@ func shortenURL(urlInput string, userID string, h *Handler, correlationID string
 	if err != nil {
 		return "", err
 	}
-	logger.Log.Info("Shortened new URI", zap.String("data", urlInput), zap.String("date", time.Now().Format("2006/01/02")), zap.String("time", time.Now().Format("15:04:05")))
+	logger.Log.Info("Shortened new URI", zap.String("data", urlInput), zap.String("key", u.ID()), zap.String("user", userID), zap.String("date", time.Now().Format("2006/01/02")), zap.String("time", time.Now().Format("15:04:05")))
 
 	return u.ID(), nil
 }
