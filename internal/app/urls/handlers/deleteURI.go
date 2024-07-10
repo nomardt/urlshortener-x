@@ -36,7 +36,7 @@ func generator(ctx context.Context, keys []string, _ context.CancelFunc) chan st
 
 // Starts multiple background workers to delete the requested URLs
 func deleteFanOut(ctx context.Context, keysCh chan string, userID string, r urls.Repository) {
-	numWorkers := 5
+	numWorkers := 10
 	var errorCounter int64
 	var wg sync.WaitGroup
 	wg.Add(numWorkers)
@@ -90,7 +90,7 @@ func (h *Handler) JSONDeleteBatch(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Try to delete the requested shortened URLs in the background
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	keysCh := generator(ctx, keys, cancel)
 	go deleteFanOut(ctx, keysCh, userID, h.Repository)
 

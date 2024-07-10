@@ -200,18 +200,20 @@ func (r *InMemoryRepo) SaveURL(url urlsDomain.URL, userID string) error {
 // Sets the flag is_deleted to true if the shortened URL belongs to user
 func (r *InMemoryRepo) DeleteURL(key string, userID string) error {
 	// Checking if the shortened URL belongs to the specified user
+	var notOwner bool
 	urlNotFound := true
-UserCheck:
+
 	for i, savedURL := range r.urls {
 		if savedURL.ShortURL == key {
 			for _, savedUser := range r.users {
-				if savedUser.URLID == savedURL.CorrelationID && savedUser.UserID != userID {
-					logger.Log.Info(ErrNotOwner.Error(), zap.String("user", userID), zap.String("ID", key))
-					return ErrNotOwner
-				} else {
-					r.urls[i].IsDeleted = true
+				if savedUser.URLID == savedURL.CorrelationID {
 					urlNotFound = false
-					break UserCheck
+					if savedUser.UserID == userID {
+						r.urls[i].IsDeleted = true
+						notOwner = false
+					} else {
+						notOwner = true
+					}
 				}
 			}
 		}
@@ -220,6 +222,9 @@ UserCheck:
 	if urlNotFound {
 		logger.Log.Info(ErrNotFoundURL.Error(), zap.String("key", key))
 		return ErrNotFoundURL
+	} else if notOwner {
+		logger.Log.Info(ErrNotOwner.Error(), zap.String("user", userID), zap.String("ID", key))
+		return ErrNotOwner
 	}
 
 	// Setting the flag is_deleted to true in r.file by rewriting it

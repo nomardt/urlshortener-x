@@ -191,22 +191,25 @@ func (r *PostgresRepo) DeleteURL(key string, userID string) error {
 	defer tx.Rollback() //nolint:all
 
 	// Check if the URL with the specified key belongs to user
-	stmtURLOwner, err := tx.PrepareContext(r.ctx, "SELECT users[1] AS owner FROM urls WHERE key = $1")
+	stmtURLOwner, err := tx.PrepareContext(r.ctx, "SELECT 1, users[1] FROM urls WHERE key = $1 AND $2 = ANY(users)")
 	if err != nil {
 		logger.Log.Info("Failed to prepare statement to lookup the URL owner", zap.Error(err))
 		return err
 	}
 	defer stmtURLOwner.Close()
 
-	var owner string
-	err = stmtURLOwner.QueryRowContext(r.ctx, key).Scan(&owner)
+	var isOwner int
+	var creator string
+	err = stmtURLOwner.QueryRowContext(r.ctx, key).Scan(&isOwner, &creator)
 	if errors.Is(err, sql.ErrNoRows) {
 		logger.Log.Info(ErrNotFoundURL.Error(), zap.String("ID", key))
 		return ErrNotFoundURL
+	} else if err != nil {
+		logger.Log.Info("Failed to execute SQL query", zap.Error(err))
 	}
 
-	if owner != userID {
-		logger.Log.Info(ErrNotOwner.Error(), zap.String("user", userID), zap.String("ID", key))
+	if isOwner == 1 {
+		logger.Log.Info(ErrNotOwner.Error(), zap.String("user", userID), zap.String("creator", creator), zap.String("ID", key))
 		return ErrNotOwner
 	}
 
