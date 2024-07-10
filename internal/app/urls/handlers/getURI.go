@@ -23,12 +23,17 @@ type responseUserURL struct {
 func (h *Handler) GetURI(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 
-	if url, err := h.GetURL(id); !errors.Is(err, urlsInfra.ErrNotFoundURL) {
+	if url, err := h.GetURL(id); err == nil {
 		w.Header().Set("Location", url)
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusTemporaryRedirect)
+	} else if errors.Is(err, urlsInfra.ErrURLGone) {
+		http.Error(w, "The specified URL has been deleted!", http.StatusGone)
+	} else if errors.Is(err, urlsInfra.ErrNotFoundURL) {
+		http.Error(w, "URL with the specified ID: '"+id+"' was not found on the server!", http.StatusBadRequest)
 	} else {
-		http.Error(w, "URL with the specified ID:"+id+" was not found on the server!", http.StatusBadRequest)
+		logger.Log.Info("Couldn't get URI", zap.Error(err))
+		http.Error(w, "Error", http.StatusBadGateway)
 	}
 }
 

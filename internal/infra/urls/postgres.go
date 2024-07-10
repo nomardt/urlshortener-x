@@ -43,7 +43,7 @@ func (r *PostgresRepo) initializeDB(config conf.Configuration) error {
 }
 
 // Executes migrations
-func (r *PostgresRepo) loadTable() error {
+func (r *PostgresRepo) loadMigrations(dbName string) error {
 	driver, err := postgres.WithInstance(r.db, &postgres.Config{})
 	if err != nil {
 		logger.Log.Info("Failed to create migrate driver", zap.Error(err))
@@ -52,7 +52,7 @@ func (r *PostgresRepo) loadTable() error {
 
 	m, err := migrate.NewWithDatabaseInstance(
 		"file://migrations",
-		"url", driver)
+		dbName, driver)
 	if err != nil {
 		logger.Log.Info("Failed to create a new Migrate instance", zap.Error(err))
 		return err
@@ -77,8 +77,8 @@ func NewPostgresRepo(config conf.Configuration) *PostgresRepo {
 		log.Fatal(err)
 	}
 
-	if err := postgresRepo.loadTable(); err != nil {
-		logger.Log.Info("Error when loading table urls", zap.Error(err))
+	if err := postgresRepo.loadMigrations(config.DB.DBname); err != nil {
+		logger.Log.Info("Error when loading migrations", zap.Error(err))
 		log.Fatal(err)
 	}
 
@@ -109,7 +109,7 @@ func (r *PostgresRepo) SaveURL(url urlsDomain.URL, userID string) error {
 	}
 
 	// Checking if the provided full_uri is unique
-	stmtCheckFullURI, err := tx.PrepareContext(r.ctx, "SELECT key FROM urls WHERE full_uri = $1")
+	stmtCheckFullURI, err := tx.PrepareContext(r.ctx, "SELECT key FROM urls WHERE full_uri = $1 AND is_deleted = FALSE")
 	if err != nil {
 		logger.Log.Info("Couldn't prepare SELECT statement for table urls", zap.Error(err))
 		return err
@@ -181,33 +181,88 @@ func (r *PostgresRepo) SaveURL(url urlsDomain.URL, userID string) error {
 	return tx.Commit()
 }
 
+// Sets the flag is_deleted to true if the shortened URL belongs to user
+func (r *PostgresRepo) DeleteURL(key string, userID string) error {
+	tx, err := r.db.BeginTx(r.ctx, nil)
+	if err != nil {
+		logger.Log.Info("Failed to begin transaction", zap.Error(err))
+		return err
+	}
+	defer tx.Rollback() //nolint:all
+
+	// Check if the URL with the specified key belongs to user
+	stmtURLOwner, err := tx.PrepareContext(r.ctx, "SELECT users[1] AS owner FROM urls WHERE key = $1")
+	if err != nil {
+		logger.Log.Info("Failed to prepare statement to lookup the URL owner", zap.Error(err))
+		return err
+	}
+	defer stmtURLOwner.Close()
+
+	var owner string
+	err = stmtURLOwner.QueryRowContext(r.ctx, key).Scan(&owner)
+	if errors.Is(err, sql.ErrNoRows) {
+		logger.Log.Info(ErrNotFoundURL.Error(), zap.String("ID", key))
+		return ErrNotFoundURL
+	}
+
+	if owner != userID {
+		logger.Log.Info(ErrNotOwner.Error(), zap.String("user", userID), zap.String("ID", key))
+		return ErrNotOwner
+	}
+
+	// Update the is_deleted to true
+	stmtDeleteURL, err := tx.PrepareContext(r.ctx, "UPDATE urls SET is_deleted = TRUE WHERE key = $1")
+	if err != nil {
+		logger.Log.Info("Couldn't prepare statement for is_deleted update", zap.Error(err))
+		return err
+	}
+	defer stmtDeleteURL.Close()
+
+	_, err = stmtDeleteURL.ExecContext(r.ctx, key)
+	if err != nil {
+		logger.Log.Info("Failed to update is_deleted to true", zap.Error(err), zap.String("key", key))
+		return err
+	}
+
+	return tx.Commit()
+}
+
 // Check if there is a URL stored in the Repo with the specified ID
 func (r *PostgresRepo) GetURL(key string) (string, error) {
 	tx, err := r.db.BeginTx(r.ctx, nil)
 	if err != nil {
+		logger.Log.Info("Failed to begin transaction", zap.Error(err))
 		return "", err
 	}
 	defer tx.Rollback() //nolint:all
 
-	stmtGetURL, err := tx.PrepareContext(r.ctx, "SELECT full_uri FROM urls WHERE key = $1")
+	stmtGetURL, err := tx.PrepareContext(r.ctx, "SELECT full_uri, is_deleted FROM urls WHERE key = $1")
 	if err != nil {
-		logger.Log.Info("Couldn't get full_uri with the specified key", zap.Error(err))
+		logger.Log.Info("Couldn't prepare statement to get the specified URL", zap.Error(err))
 		return "", err
 	}
 	defer stmtGetURL.Close()
 
 	var fullURL string
-	err = stmtGetURL.QueryRowContext(r.ctx, key).Scan(&fullURL)
+	var isDeleted bool
+	err = stmtGetURL.QueryRowContext(r.ctx, key).Scan(&fullURL, &isDeleted)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
+			logger.Log.Info(ErrNotFoundURL.Error())
 			return "", ErrNotFoundURL
 		}
 
 		logger.Log.Info("Couldn't retrieve shortened URL", zap.Error(err))
 		return "", err
 	}
+	err = tx.Commit()
 
-	return fullURL, tx.Commit()
+	if isDeleted {
+		logger.Log.Info(ErrURLGone.Error(), zap.String("ID", key))
+		return "", ErrURLGone
+	}
+
+	return fullURL, err
 }
 
 // Returns all URLs connected to the user specified. Output is urls[key] = originalURL
@@ -221,7 +276,7 @@ func (r *PostgresRepo) GetAllUserURLs(userID string) (map[string]string, error) 
 
 	stmt, err := tx.PrepareContext(r.ctx, `
 		SELECT key, full_uri FROM urls
-		WHERE $1 = ANY(users)
+		WHERE $1 = ANY(users) AND is_deleted = FALSE
 	`)
 	if err != nil {
 		logger.Log.Info("Couldn't prepare a statement to get keys and full_uris of the specified user ID", zap.Error(err))

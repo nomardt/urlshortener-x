@@ -1,10 +1,11 @@
 BEGIN TRANSACTION;
 
 CREATE TABLE IF NOT EXISTS urls (
-			id VARCHAR(255) PRIMARY KEY DEFAULT gen_random_uuid()::text UNIQUE,
+			id VARCHAR(255) PRIMARY KEY DEFAULT gen_random_uuid()::text,
 			key VARCHAR(100),
-			full_uri VARCHAR(1500) UNIQUE,
+			full_uri VARCHAR(1500),
 			users TEXT[],
+			is_deleted BOOLEAN DEFAULT FALSE,
 			created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 			updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 		);

@@ -12,10 +12,12 @@ type URL struct {
 	correlationID string
 	id            string
 	longURL       string
+	isDeleted     bool
 }
 
 type Repository interface {
 	SaveURL(url URL, userID string) error
+	DeleteURL(key string, userID string) error
 	GetURL(key string) (string, error)
 	GetAllUserURLs(userID string) (map[string]string, error)
 	Ping(ctx context.Context) error
@@ -54,6 +56,10 @@ func (u *URL) LongURL() string {
 
 func (u *URL) CorrelationID() string {
 	return u.correlationID
+}
+
+func (u *URL) IsDeleted() bool {
+	return u.isDeleted
 }
 
 func validateURL(rawURL string) error {

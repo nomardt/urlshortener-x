@@ -29,6 +29,7 @@ type urlInFile struct {
 	CorrelationID string `json:"correlation_id"`
 	ShortURL      string `json:"short_url"`
 	OriginalURL   string `json:"original_url"`
+	IsDeleted     bool   `json:"is_deleted"`
 }
 
 type userInFile struct {
@@ -56,16 +57,16 @@ func NewInMemoryRepo(config conf.Configuration) *InMemoryRepo {
 		pathUsers = config.StorageFile + "2"
 	}
 
-	// Loading URLs previously stored on the hard drive
+	// Loading URLs previously stored on the hard drive. If it fails then create new files
 	if err := inMemoryRepo.loadStoredURLs(config.StorageFile); err != nil {
 		logger.Log.Info("Couldn't recover any previously shortened URLs!", zap.Error(err))
 
-		// Creating a file for urls
+		// Creating a new file for urls
 		if _, err := os.Create(config.StorageFile); err != nil {
 			logger.Log.Info("No file will be created to store shortened URLs")
 		}
 
-		// Creating a file for users
+		// Creating a new file for users
 		if _, err := os.Create(pathUsers); err != nil {
 			logger.Log.Info("No file will be created to store users", zap.Error(err))
 		}
@@ -88,14 +89,14 @@ func (r *InMemoryRepo) SaveURL(url urlsDomain.URL, userID string) error {
 	// Checking if the provided correlation ID is unique
 	for _, savedURL := range r.urls {
 		if savedURL.CorrelationID == url.CorrelationID() {
-			logger.Log.Info("The specified correlation ID already exists", zap.String("correlation_id", url.CorrelationID()))
+			logger.Log.Info(ErrCorIDNotUnique.Error(), zap.String("correlation_id", url.CorrelationID()))
 			return ErrCorIDNotUnique
 		}
 	}
 
 	// Checking if the provided full URI is unique
 	for _, savedURL := range r.urls {
-		if savedURL.OriginalURL == url.LongURL() {
+		if savedURL.OriginalURL == url.LongURL() && !savedURL.IsDeleted {
 			logger.Log.Info("The specified full URI already exists", zap.String("full_uri", url.LongURL()))
 
 			// Checking if the URL is already attached to the current user
@@ -147,17 +148,19 @@ func (r *InMemoryRepo) SaveURL(url urlsDomain.URL, userID string) error {
 		CorrelationID: url.CorrelationID(),
 		ShortURL:      url.ID(),
 		OriginalURL:   url.LongURL(),
+		IsDeleted:     false,
 	}
 	dataURL, err := json.Marshal(jsonURL)
 	if err != nil {
 		logger.Log.Info("Couldn't store the shortened URL in the file", zap.Error(err))
-		return nil
+		return err
 	}
 	dataURL = append(dataURL, '\n')
 
 	_, err = fileURL.Write(dataURL)
 	if err != nil {
 		logger.Log.Info("Couldn't save the shortened URL to the file", zap.String("file", r.file), zap.Error(err))
+		return err
 	}
 	fileURL.Close() //nolint:all
 
@@ -167,6 +170,7 @@ func (r *InMemoryRepo) SaveURL(url urlsDomain.URL, userID string) error {
 	fileUsers, err := os.OpenFile(r.fileUsers, os.O_WRONLY|os.O_APPEND, 0666)
 	if err != nil {
 		logger.Log.Info("Couldn't open users file", zap.Error(err))
+		return err
 	}
 
 	jsonUser := &userInFile{
@@ -177,16 +181,70 @@ func (r *InMemoryRepo) SaveURL(url urlsDomain.URL, userID string) error {
 	dataUser, err := json.Marshal(jsonUser)
 	if err != nil {
 		logger.Log.Info("Couldn't attach already shortened URL to user", zap.Error(err))
+		return err
 	}
 	dataUser = append(dataUser, '\n')
 
 	_, err = fileUsers.Write(dataUser)
 	if err != nil {
 		logger.Log.Info("Couldn't write URL relation to user", zap.Error(err))
+		return err
 	}
 	fileUsers.Close() //nolint:all
 
 	r.users = append(r.users, *jsonUser)
+
+	return nil
+}
+
+// Sets the flag is_deleted to true if the shortened URL belongs to user
+func (r *InMemoryRepo) DeleteURL(key string, userID string) error {
+	// Checking if the shortened URL belongs to the specified user
+	urlNotFound := true
+UserCheck:
+	for i, savedURL := range r.urls {
+		if savedURL.ShortURL == key {
+			for _, savedUser := range r.users {
+				if savedUser.URLID == savedURL.CorrelationID && savedUser.UserID != userID {
+					logger.Log.Info(ErrNotOwner.Error(), zap.String("user", userID), zap.String("ID", key))
+					return ErrNotOwner
+				} else {
+					r.urls[i].IsDeleted = true
+					urlNotFound = false
+					break UserCheck
+				}
+			}
+		}
+	}
+
+	if urlNotFound {
+		logger.Log.Info(ErrNotFoundURL.Error(), zap.String("key", key))
+		return ErrNotFoundURL
+	}
+
+	// Setting the flag is_deleted to true in r.file by rewriting it
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	file, err := os.Create(r.file)
+	if err != nil {
+		logger.Log.Info("Couldn't truncate the shortened urls file", zap.Error(err))
+		return err
+	}
+	defer file.Close()
+
+	writer := bufio.NewWriter(file)
+	for _, savedURL := range r.urls {
+		jsonURL, err := json.Marshal(savedURL)
+		if err != nil {
+			logger.Log.Info("Error serializing URL in JSON", zap.Error(err))
+			return err
+		}
+
+		writer.Write(jsonURL)
+		writer.WriteString("\n")
+	}
+	writer.Flush()
 
 	return nil
 }
@@ -198,6 +256,10 @@ func (r *InMemoryRepo) GetURL(id string) (string, error) {
 
 	for _, url := range r.urls {
 		if url.ShortURL == id && url.OriginalURL != "" {
+			if url.IsDeleted {
+				return "", ErrURLGone
+			}
+
 			return url.OriginalURL, nil
 		}
 	}
@@ -214,7 +276,7 @@ func (r *InMemoryRepo) GetAllUserURLs(userID string) (map[string]string, error) 
 	for _, user := range r.users {
 		if user.UserID == userID {
 			for _, url := range r.urls {
-				if url.CorrelationID == user.URLID {
+				if url.CorrelationID == user.URLID && !url.IsDeleted {
 					urls[url.ShortURL] = url.OriginalURL
 				}
 			}
@@ -224,8 +286,11 @@ func (r *InMemoryRepo) GetAllUserURLs(userID string) (map[string]string, error) 
 	return urls, nil
 }
 
+// Checks if files storing urls and users are present in the filesystem
 func (r *InMemoryRepo) Ping(_ context.Context) error {
 	if _, err := os.Stat(r.file); err != nil {
+		return err
+	} else if _, err = os.Stat(r.fileUsers); err != nil {
 		return err
 	} else {
 		return nil

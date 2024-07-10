@@ -25,6 +25,7 @@ func Setup(router *chi.Mux, urlsRepo urlsDomain.Repository, config conf.Configur
 		r.Use(auth.TokenNecessary(config.Secret))
 
 		r.Get("/api/user/urls", handler.GetUserURLs)
+		r.Delete("/api/user/urls", middlewares.OnlyJSONBody(handler.JSONDeleteBatch))
 	})
 
 	router.Get("/{id}", handler.GetURI)
