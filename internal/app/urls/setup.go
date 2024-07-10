@@ -5,27 +5,15 @@ import (
 	conf "github.com/nomardt/urlshortener-x/cmd/config"
 	"github.com/nomardt/urlshortener-x/internal/app/urls/handlers"
 	"github.com/nomardt/urlshortener-x/internal/app/urls/middlewares"
-	urlsDomain "github.com/nomardt/urlshortener-x/internal/domain/urls"
-	"github.com/nomardt/urlshortener-x/internal/infra/auth"
+	"github.com/nomardt/urlshortener-x/internal/infra/logger"
 )
 
-func Setup(router *chi.Mux, urlsRepo urlsDomain.Repository, config conf.Configuration) {
+func Setup(router *chi.Mux, urlsRepo handlers.Repository, config conf.Configuration) {
 	handler := handlers.NewHandler(urlsRepo, config)
 
-	router.Group(func(r chi.Router) {
-		r.Use(auth.WithAuth(config.Secret))
+	router.Post("/", logger.WithLogging(middlewares.OnlyPlaintextBody(handler.PostURI)))
+	router.Get("/{id}", logger.WithLogging(handler.GetURI))
 
-		r.Post("/", middlewares.OnlyPlaintextBody(handler.PostURI))
-
-		r.Post("/api/shorten", middlewares.OnlyJSONBody(handler.JSONPostURI))
-		r.Post("/api/shorten/batch", middlewares.OnlyJSONBody(handler.JSONPostBatch))
-	})
-
-	router.Group(func(r chi.Router) {
-		r.Use(auth.TokenNecessary(config.Secret))
-
-		r.Get("/api/user/urls", handler.GetUserURLs)
-	})
-
-	router.Get("/{id}", handler.GetURI)
+	router.Post("/api/shorten", logger.WithLogging(middlewares.OnlyJSONBody(handler.JSONPostURI)))
+	router.Post("/api/shorten/batch", logger.WithLogging(middlewares.OnlyJSONBody(handler.JSONPostBatch)))
 }

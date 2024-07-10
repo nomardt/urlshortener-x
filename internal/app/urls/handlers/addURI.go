@@ -5,12 +5,10 @@ import (
 	"errors"
 	"io"
 	"net/http"
-	"strings"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/nomardt/urlshortener-x/internal/domain/urls"
-	"github.com/nomardt/urlshortener-x/internal/infra/auth"
 	"github.com/nomardt/urlshortener-x/internal/infra/logger"
 	urlsInfra "github.com/nomardt/urlshortener-x/internal/infra/urls"
 	"go.uber.org/zap"
@@ -34,9 +32,7 @@ type responseShortenBatchURLs struct {
 	ShortURL      string `json:"short_url"`
 }
 
-// Shortens url on the backend with the specified correlation ID.
-// If correlation ID is set to "" then a random uuid will be used
-func shortenURL(urlInput string, userID string, h *Handler, correlationID string) (string, error) {
+func shortenURL(urlInput string, h *Handler, correlationID string) (string, error) {
 	if urlInput == "" {
 		return "", errors.New("no URL provided")
 	}
@@ -47,7 +43,7 @@ func shortenURL(urlInput string, userID string, h *Handler, correlationID string
 
 	var u *urls.URL
 	var err error
-	// If a key is predefined then store all shortened URLs at that query path
+	// If a key is predefined in config then store all shortened URLs at that path
 	if h.Configuration.Path == "" {
 		u, err = urls.NewURLWithoutKey(urlInput, correlationID)
 	} else {
@@ -57,8 +53,7 @@ func shortenURL(urlInput string, userID string, h *Handler, correlationID string
 		return "", err
 	}
 
-	// Stores the urls.URL object on the backend
-	err = h.SaveURL(*u, userID)
+	err = h.SaveURL(u)
 	if err != nil {
 		return "", err
 	}
@@ -67,7 +62,6 @@ func shortenURL(urlInput string, userID string, h *Handler, correlationID string
 	return u.ID(), nil
 }
 
-// Shortens all urls received in JSON objects in request body
 func (h *Handler) JSONPostBatch(w http.ResponseWriter, r *http.Request) {
 	var clientInput []requestShortenBatchURLs
 	if err := json.NewDecoder(r.Body).Decode(&clientInput); err != nil {
@@ -75,36 +69,22 @@ func (h *Handler) JSONPostBatch(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Handle the session cookie
-	jwtCookie := r.Header.Get("Authorization") // No need to check if cookie is present because it is done by middleware
-	jwtCookie, _ = strings.CutPrefix(jwtCookie, "Bearer ")
-	userID, err := auth.GetUserID(jwtCookie, h.Secret)
-	if err != nil {
-		logger.Log.Info("Couldn't decrypt the cookie", zap.String("Authorization", jwtCookie), zap.Error(err))
-		http.Error(w, "Unathorized", http.StatusUnauthorized)
-	}
-
 	var shortURLs []responseShortenBatchURLs
 	for _, url := range clientInput {
 		var shortURL string
 
-		// Saving every JSON object with correlation_id and original_url fields on the backend separately
-		key, err := shortenURL(url.OriginalURL, userID, h, url.CorrelationID)
+		key, err := shortenURL(url.OriginalURL, h, url.CorrelationID)
 		var errURINotUnique *urlsInfra.ErrURINotUnique
 		if errors.As(err, &errURINotUnique) {
-			// The JSON object contains original_url that's already been shortened, use the existing query path
 			shortURL = "http://" + h.Configuration.ListenAddress + "/" + errURINotUnique.ExistingKey
 		} else if errors.Is(err, urlsInfra.ErrCorIDNotUnique) {
-			// The JSON object contains correlation_id that's already been taken
 			http.Error(w, "The specified correlation ID is already present on the server! "+url.CorrelationID, http.StatusBadRequest)
 			return
 		} else if err != nil {
-			// General error, abort
 			http.Error(w, "Bad Request", http.StatusBadRequest)
 			logger.Log.Info("Couldn't save URL sent in batch", zap.Error(err))
 			return
 		} else {
-			// No error, construct the shortened URL with the returned key (query path)
 			shortURL = "http://" + h.Configuration.ListenAddress + "/" + key
 		}
 
@@ -132,7 +112,6 @@ func (h *Handler) JSONPostBatch(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// Shortens url received in JSON url field
 func (h *Handler) JSONPostURI(w http.ResponseWriter, r *http.Request) {
 	var clientInput requestShortenURL
 	if err := json.NewDecoder(r.Body).Decode(&clientInput); err != nil {
@@ -140,32 +119,19 @@ func (h *Handler) JSONPostURI(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Handle the session cookie
-	jwtCookie := r.Header.Get("Authorization") // No need to check if cookie is present because it is done by middleware
-	jwtCookie, _ = strings.CutPrefix(jwtCookie, "Bearer ")
-	userID, err := auth.GetUserID(jwtCookie, h.Secret)
-	if err != nil {
-		logger.Log.Info("Couldn't decrypt the cookie", zap.String("Authorization", jwtCookie), zap.Error(err))
-		http.Error(w, "Unathorized", http.StatusUnauthorized)
-	}
-
 	var shortURL string
 	responseCode := http.StatusCreated
 
-	// Saving the JSON object with url field on the backend
-	key, err := shortenURL(clientInput.URL, userID, h, "")
+	id, err := shortenURL(clientInput.URL, h, "")
 	var errURINotUnique *urlsInfra.ErrURINotUnique
 	if errors.As(err, &errURINotUnique) {
-		// If the url's already been saved then use the existing (old) query path
 		shortURL = "http://" + h.Configuration.ListenAddress + "/" + errURINotUnique.ExistingKey
 		responseCode = http.StatusConflict
 	} else if err != nil {
-		// General error, abort
 		http.Error(w, "Bad Request", http.StatusBadRequest)
 		return
 	} else {
-		// No error, construct the shortened URL with the returned key (query path)
-		shortURL = "http://" + h.Configuration.ListenAddress + "/" + key
+		shortURL = "http://" + h.Configuration.ListenAddress + "/" + id
 	}
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(responseCode)
@@ -186,7 +152,6 @@ func (h *Handler) JSONPostURI(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// Shortens url received in plaintext request body
 func (h *Handler) PostURI(w http.ResponseWriter, r *http.Request) {
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
@@ -194,18 +159,7 @@ func (h *Handler) PostURI(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Handle the session cookie
-	jwtCookie := r.Header.Get("Authorization") // No need to check if cookie is present because it is done by middleware
-	jwtCookie, _ = strings.CutPrefix(jwtCookie, "Bearer ")
-	userID, err := auth.GetUserID(jwtCookie, h.Secret)
-	if err != nil {
-		logger.Log.Info("Couldn't decrypt the cookie", zap.String("Authorization", jwtCookie), zap.Error(err))
-		http.Error(w, "Unathorized", http.StatusUnauthorized)
-		return
-	}
-
-	// Shorten the body on the backend
-	id, err := shortenURL(string(body), userID, h, "")
+	id, err := shortenURL(string(body), h, "")
 	var errURINotUnique *urlsInfra.ErrURINotUnique
 	if errors.As(err, &errURINotUnique) {
 		w.WriteHeader(http.StatusConflict)
