@@ -3,8 +3,10 @@ package urls
 import "errors"
 
 var (
-	ErrNotFoundURL    = errors.New("the URL with the specified id was not found")
+	ErrNotFoundURL    = errors.New("the URL with the specified ID was not found")
+	ErrURLGone        = errors.New("the URL with the specified ID has been removed")
 	ErrCorIDNotUnique = errors.New("the specified correlation ID is not unique")
+	ErrNotOwner       = errors.New("the URL with the specified ID belongs to other user")
 )
 
 type ErrURINotUnique struct {
